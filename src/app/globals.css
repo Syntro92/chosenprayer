@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FFFFFF;
+  --foreground: #171918;
+}
+
+@theme inline {
+  --color-ivory: #F7F8F6;
+  --color-charcoal-deep: #171918;
+  --color-slate: #66706D;
+  --color-bless: #FFBE00;
+  --color-bless-deep: #E6A900;
+  --color-cream: #FFF6D6;
+  --color-line: #E2E6E3;
+  --color-mist: #EEF3F1;
+  --color-illus-light: #C7CCC9;
+  --color-illus-dark: #252827;
+  --color-sage: #7E9B83;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Hero entrance: each element rises and fades in, staggered via --d. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
+}
