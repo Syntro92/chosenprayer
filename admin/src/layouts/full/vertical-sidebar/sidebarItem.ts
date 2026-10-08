@@ -8,7 +8,18 @@ import {
   BugIcon,
   DashboardIcon,
   BrandChromeIcon,
-  HelpIcon
+  HelpIcon,
+  ChartBarIcon,
+  UsersIcon,
+  ReceiptIcon,
+  BroadcastIcon,
+  SettingsIcon,
+  HeartbeatIcon,
+  ToggleLeftIcon,
+  EyeIcon,
+  UserIcon,
+  PlusIcon,
+  ListDetailsIcon
 } from 'vue-tabler-icons';
 
 export interface menu {
@@ -28,82 +39,66 @@ export interface menu {
 }
 
 const sidebarItem: menu[] = [
-  { header: 'Dashboard' },
+  { header: 'Main' },
   {
-    title: 'Default',
+    title: 'Dashboard',
     icon: DashboardIcon,
     to: '/dashboard/default'
   },
-  { divider: true },
-  { header: 'Pages' },
   {
-    title: 'Authentication',
-    icon: KeyIcon,
-    to: '/auth',
-    children: [
-      {
-        title: 'Login',
-        icon: CircleIcon,
-        to: '/login1'
-      },
-      {
-        title: 'Register',
-        icon: CircleIcon,
-        to: '/register'
-      }
-    ]
+    title: 'Channels',
+    icon: BroadcastIcon,
+    to: '/channels'
   },
   {
-    title: 'Error 404',
-    icon: BugIcon,
-    to: '/error'
-  },
-  { divider: true },
-  { header: 'Utilities' },
-  {
-    title: 'Typography',
-    icon: TypographyIcon,
-    to: '/utils/typography'
+    title: 'Channel Details',
+    icon: ListDetailsIcon,
+    to: '/channels/1'
   },
   {
-    title: 'Shadows',
-    icon: ShadowIcon,
-    to: '/utils/shadows'
+    title: 'Add Channel',
+    icon: PlusIcon,
+    to: '/channels/add'
   },
   {
-    title: 'Colors',
-    icon: PaletteIcon,
-    to: '/utils/colors'
-  },
-
-  {
-    title: 'Icons',
-    icon: WindmillIcon,
-    to: '/forms/radio',
-    children: [
-      {
-        title: 'Tabler Icons',
-        icon: CircleIcon,
-        to: '/icons/tabler'
-      },
-      {
-        title: 'Material Icons',
-        icon: CircleIcon,
-        to: '/icons/material'
-      }
-    ]
-  },
-  { divider: true },
-  {
-    title: 'Sample Page',
-    icon: BrandChromeIcon,
-    to: '/starter'
+    title: 'Transactions',
+    icon: ReceiptIcon,
+    to: '/transactions'
   },
   {
-    title: 'Documentation',
-    icon: HelpIcon,
-    to: 'https://codedthemes.gitbook.io/berry-vuetify/',
-    type: 'external'
+    title: 'Users',
+    icon: UsersIcon,
+    to: '/users'
+  },
+  {
+    title: 'User Details',
+    icon: UserIcon,
+    to: '/users/1'
+  },
+  {
+    title: 'Analytics',
+    icon: ChartBarIcon,
+    to: '/analytics'
+  },
+  {
+    title: 'Live Visitors',
+    icon: EyeIcon,
+    to: '/live-visitors'
+  },
+  {
+    title: 'Site Health',
+    icon: HeartbeatIcon,
+    to: '/site-health'
+  },
+  {
+    title: 'Feature Management',
+    icon: ToggleLeftIcon,
+    to: '/features'
+  },
+  {
+    title: 'Settings',
+    icon: SettingsIcon,
+    to: '/settings'
   }
 ];
 

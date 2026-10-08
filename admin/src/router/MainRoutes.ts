@@ -7,6 +7,66 @@ const MainRoutes = {
   component: () => import('@/layouts/full/FullLayout.vue'),
   children: [
     {
+      name: 'Channels',
+      path: '/channels',
+      component: () => import('@/views/main/ChannelsPage.vue')
+    },
+    {
+      name: 'Add Channel',
+      path: '/channels/add',
+      component: () => import('@/views/main/AddChannelPage.vue')
+    },
+    {
+      name: 'Channel Details',
+      path: '/channels/:id',
+      component: () => import('@/views/main/ChannelDetailsPage.vue')
+    },
+    {
+      name: 'Transactions',
+      path: '/transactions',
+      component: () => import('@/views/main/TransactionsPage.vue')
+    },
+    {
+      name: 'Transaction Details',
+      path: '/transactions/:id',
+      component: () => import('@/views/main/TransactionDetailsPage.vue')
+    },
+    {
+      name: 'Users',
+      path: '/users',
+      component: () => import('@/views/main/UsersPage.vue')
+    },
+    {
+      name: 'User Details',
+      path: '/users/:id',
+      component: () => import('@/views/main/UserDetailsPage.vue')
+    },
+    {
+      name: 'Analytics',
+      path: '/analytics',
+      component: () => import('@/views/main/AnalyticsPage.vue')
+    },
+    {
+      name: 'Live Visitors',
+      path: '/live-visitors',
+      component: () => import('@/views/main/LiveVisitorsPage.vue')
+    },
+    {
+      name: 'Site Health',
+      path: '/site-health',
+      component: () => import('@/views/main/SiteHealthPage.vue')
+    },
+    {
+      name: 'Feature Management',
+      path: '/features',
+      component: () => import('@/views/main/FeatureManagementPage.vue')
+    },
+    {
+      name: 'Settings',
+      path: '/settings',
+      component: () => import('@/views/main/SettingsPage.vue')
+    },
+    {
       name: 'LandingPage',
       path: '/',
       component: () => import('@/views/dashboards/default/DefaultDashboard.vue')

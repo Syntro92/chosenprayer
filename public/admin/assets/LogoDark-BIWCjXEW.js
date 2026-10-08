@@ -1,0 +1,1 @@
+import{_ as o}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{o as c,s as e}from"./index-7lQfy4iK.js";const s={},r={class:"logo"};function t(n,_){return c(),e("div",r)}const i=o(s,[["render",t]]);export{i as L};

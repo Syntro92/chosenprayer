@@ -2,16 +2,18 @@
 import { shallowRef } from 'vue';
 import { ArchiveIcon, CopyIcon, DownloadIcon, FileExportIcon } from 'vue-tabler-icons';
 import iconCard from '@/assets/images/icons/icon-card.svg';
+import { summary, money } from '../overviewData';
 const items = shallowRef([
   { title: 'Import Card', icon: DownloadIcon },
   { title: 'Copy Data', icon: CopyIcon },
   { title: 'Export', icon: FileExportIcon },
   { title: 'Archive File', icon: ArchiveIcon }
 ]);
+const s = summary.totalSupport;
 </script>
 
 <template>
-  <v-card elevation="0" class="bg-secondary overflow-hidden bubble-shape bubble-secondary-shape">
+  <v-card elevation="0" class="h-100 bg-secondary overflow-hidden bubble-shape bubble-secondary-shape">
     <v-card-text>
       <div class="d-flex align-start mb-6">
         <v-btn icon rounded="sm" color="darksecondary" variant="flat">
@@ -38,9 +40,11 @@ const items = shallowRef([
         </div>
       </div>
       <h2 class="text-h1 font-weight-medium">
-        $500.00 <a href="#"><CircleArrowUpRightIcon stroke-width="1.5" width="28" class="text-white" /> </a>
+        {{ money(s.value) }} <a href="#"><CircleArrowUpRightIcon stroke-width="1.5" width="28" class="text-white" /> </a>
       </h2>
-      <span class="text-subtitle-1 text-medium-emphasis text-white">Total Earning</span>
+      <div class="text-subtitle-1 text-white">Total Support</div>
+      <div class="text-caption text-white" style="opacity: 0.8">Total received</div>
+      <div class="text-subtitle-2 text-white mt-2 font-weight-medium">+{{ s.changePct }}% {{ s.period }}</div>
     </v-card-text>
   </v-card>
 </template>
