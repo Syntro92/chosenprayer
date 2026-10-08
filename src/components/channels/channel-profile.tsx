@@ -10,11 +10,11 @@ import {
   type ChannelProfileData,
   type Blessing,
 } from "@/lib/channels";
+import { OriginButton } from "@/components/ui/origin-button";
 import { CoverArt, CrowdIllustration, TONE_CLASS } from "./illustrations";
 
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
-const primaryBtn = `inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-bless px-6 text-sm font-semibold text-charcoal-deep shadow-sm transition hover:bg-bless-deep active:scale-[0.98] ${focus}`;
 const ghostBtn = `inline-flex h-12 items-center justify-center rounded-xl border border-line bg-white px-5 text-sm font-semibold text-charcoal-deep transition hover:border-charcoal-deep/40 active:scale-[0.98] ${focus}`;
 const card =
   "rounded-[18px] border border-line bg-white shadow-[0_1px_2px_rgba(23,25,24,0.04)]";
@@ -189,16 +189,16 @@ function SupportForm({
         </label>
       )}
 
-      <button
+      <OriginButton
         type="button"
         disabled={!ready}
         onClick={onContinue}
-        className={`${primaryBtn} mt-5 w-full disabled:cursor-not-allowed disabled:opacity-50`}
+        className="mt-5 w-full"
       >
         {ready
           ? `Continue · ${money(amount)}${value.frequency === "monthly" ? "/mo" : ""}`
           : "Continue"}
-      </button>
+      </OriginButton>
 
       <p className="mt-4 text-center text-sm text-slate">
         Your contribution is voluntary.
@@ -324,14 +324,14 @@ function SupportModal({
             <p className="mt-4 text-sm text-slate">
               Your contribution is voluntary. Secure payment.
             </p>
-            <button
+            <OriginButton
               type="button"
               onClick={pay}
               disabled={busy}
-              className={`${primaryBtn} mt-5 w-full disabled:opacity-60`}
+              className="mt-5 w-full"
             >
               {busy ? "Sending…" : `Send ${money(amount)}`}
-            </button>
+            </OriginButton>
             <button
               type="button"
               onClick={() => setStep("choose")}
@@ -381,22 +381,22 @@ function SupportModal({
                   placeholder="Say something kind…"
                   className={`mt-2 w-full resize-none rounded-xl border border-line p-3 text-sm text-charcoal-deep placeholder:text-slate/70 ${focus}`}
                 />
-                <button type="submit" className={`${primaryBtn} mt-3 w-full`}>
+                <OriginButton type="submit" className="mt-3 w-full">
                   Share Blessing
-                </button>
+                </OriginButton>
               </form>
             ) : (
               <>
                 <p className="mt-6 text-sm text-charcoal-deep/80">
                   Would you like to leave a message?
                 </p>
-                <button
+                <OriginButton
                   type="button"
                   onClick={() => setWriting(true)}
-                  className={`${primaryBtn} mt-3 w-full`}
+                  className="mt-3 w-full"
                 >
                   Leave a Blessing
-                </button>
+                </OriginButton>
               </>
             )}
             <button
@@ -664,10 +664,10 @@ export function ChannelProfile({
             </dl>
 
             <div className="mt-7 flex flex-wrap gap-3">
-              <button type="button" onClick={openSupport} className={primaryBtn}>
-                <Heart className="size-4 text-charcoal-deep" />
+              <OriginButton type="button" onClick={openSupport} >
+                <Heart className="size-4" />
                 Support This Channel
-              </button>
+              </OriginButton>
               <button
                 type="button"
                 aria-pressed={following}
@@ -827,10 +827,10 @@ export function ChannelProfile({
             If this channel has made a difference in your life, consider
             supporting the work.
           </p>
-          <button type="button" onClick={openSupport} className={`${primaryBtn} mt-9`}>
+          <OriginButton type="button" onClick={openSupport} className="mt-9">
             <Heart className="size-4" />
             Support This Channel
-          </button>
+          </OriginButton>
           <Link
             href="/channels"
             className={`mt-5 text-sm font-semibold text-charcoal-deep underline-offset-4 hover:underline ${focus}`}
@@ -846,17 +846,19 @@ export function ChannelProfile({
 
       {/* Mobile sticky CTA */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ivory/95 p-3 backdrop-blur lg:hidden">
-        <button
+        <OriginButton
           type="button"
           onClick={openSupport}
-          className={`${primaryBtn} w-full justify-between px-5`}
+          className="w-full px-5"
         >
-          <span className="inline-flex items-center gap-2">
-            <Heart className="size-4" />
-            Support This Channel
+          <span className="flex w-full items-center justify-between">
+            <span className="inline-flex items-center gap-2">
+              <Heart className="size-4" />
+              Support This Channel
+            </span>
+            <span aria-hidden>→</span>
           </span>
-          <span aria-hidden>→</span>
-        </button>
+        </OriginButton>
       </div>
 
       {open && (
