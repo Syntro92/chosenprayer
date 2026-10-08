@@ -1,0 +1,73 @@
+// Mobile responsive fixes
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (max-width: 959px) {
+  // header: tighter spacing so icons never overflow
+  .v-app-bar {
+    .v-toolbar__content {
+      padding: 0 8px;
+    }
+    .v-btn.mx-3 {
+      margin-left: 6px !important;
+      margin-right: 6px !important;
+    }
+    .profileBtn {
+      min-width: 0;
+      padding: 0 10px;
+    }
+  }
+  // mobile search bar spans the full header width
+  .search-sheet {
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 80px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+  }
+  // dropdowns (notifications / profile) never wider than the screen
+  .v-overlay__content > .v-sheet {
+    width: calc(100vw - 24px) !important;
+    max-width: 330px;
+  }
+  .page-wrapper {
+    padding: 12px;
+  }
+  // wide tables / charts scroll inside their card instead of the page
+  .v-table,
+  .v-card .v-table__wrapper {
+    overflow-x: auto;
+  }
+  .v-card-text,
+  .v-card-item {
+    overflow-wrap: anywhere;
+  }
+  .customizer-btn {
+    right: 6px;
+  }
+}
+
+@media (max-width: 599px) {
+  .v-main {
+    margin: 0 6px;
+  }
+  .v-navigation-drawer--temporary {
+    max-width: 85vw;
+  }
+  .h1,
+  .display-1,
+  .display-2 {
+    font-size: 26px;
+    line-height: 34px;
+  }
+  .h2,
+  .display-3 {
+    font-size: 22px;
+    line-height: 30px;
+  }
+}

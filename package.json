@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "admin:install": "npm --prefix admin ci",
+    "admin:build": "cd admin && npx vite build --base=/admin/ --outDir ../public/admin --emptyOutDir",
+    "admin:dev": "cd admin && npx vite --base=/admin/"
   },
   "dependencies": {
     "clsx": "^2.1.1",
