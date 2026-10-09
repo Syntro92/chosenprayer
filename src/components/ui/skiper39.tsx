@@ -308,10 +308,10 @@ const Skiper39 = () => {
             Discover Channels
           </a>
           <a
-            href="/how-it-works"
+            href="/community"
             className="inline-flex h-14 items-center justify-center rounded-xl border border-neutral-900/15 bg-white/50 px-8 text-base font-semibold text-neutral-800 backdrop-blur transition hover:bg-white/80 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-800 focus-visible:ring-offset-2"
           >
-            How It Works
+            Community
           </a>
         </div>
         <p style={{ "--d": "640ms" } as React.CSSProperties} className="rise-in mt-10 text-base italic text-neutral-500">

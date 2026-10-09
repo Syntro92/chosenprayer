@@ -407,10 +407,10 @@ export function FinalCta() {
             Explore Channels
           </Link>
           <Link
-            href="/how-it-works"
+            href="/community"
             className={`rounded-lg text-sm font-semibold text-charcoal-deep underline-offset-4 hover:underline ${focus}`}
           >
-            How it works →
+            Join Community →
           </Link>
         </div>
       </div>

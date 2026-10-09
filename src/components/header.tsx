@@ -8,7 +8,7 @@ import { LANGUAGES } from "@/lib/languages";
 const NAV = [
   { label: "Home", href: "/" },
   { label: "Channels", href: "/channels" },
-  { label: "How It Works", href: "/how-it-works" },
+  { label: "Community", href: "/community" },
   { label: "About", href: "/about" },
 ];
 
@@ -100,6 +100,15 @@ function LanguageSelector() {
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const pathname = usePathname();
   const active =
     NAV.find((n) =>
@@ -114,7 +123,13 @@ export function Header() {
     }`;
 
   return (
-    <header className="absolute inset-x-0 top-0 z-50">
+    <header
+      className={`fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-200 ${
+        scrolled
+          ? "bg-white shadow-[0_1px_0_rgba(0,0,0,0.06)]"
+          : "bg-transparent"
+      }`}
+    >
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <Link
           href="/"
@@ -172,7 +187,7 @@ export function Header() {
 
       <div
         id="mobile-menu"
-        className={`mx-4 origin-top rounded-2xl border border-neutral-900/10 bg-white/90 p-3 shadow-lg backdrop-blur transition duration-200 sm:mx-6 md:hidden ${
+        className={`absolute inset-x-4 top-full origin-top rounded-2xl border border-neutral-900/10 bg-white p-3 shadow-lg transition duration-200 sm:inset-x-6 md:hidden ${
           menuOpen
             ? "scale-100 opacity-100"
             : "pointer-events-none scale-95 opacity-0"

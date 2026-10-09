@@ -11,6 +11,7 @@ const COLUMNS = [
     title: "Explore",
     links: [
       { label: "Channels", href: "/channels" },
+      { label: "Community", href: "/community" },
       { label: "How It Works", href: "/how-it-works" },
       { label: "About", href: "/about" },
       { label: "Contact", href: "/contact" },

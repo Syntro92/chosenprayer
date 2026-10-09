@@ -562,6 +562,32 @@ export function ChannelProfile({
   const [shared, setShared] = useState(false);
   const [blessings, setBlessings] = useState<Blessing[]>(data.blessings);
 
+  // Mobile: the sticky button only appears once the inline support card
+  // has been scrolled past (it's above the viewport).
+  const mobileSupportRef = useRef<HTMLDivElement>(null);
+  const finalCtaRef = useRef<HTMLElement>(null);
+  const [pastCard, setPastCard] = useState(false);
+  const [ctaVisible, setCtaVisible] = useState(false);
+  const showSticky = pastCard && !ctaVisible;
+
+  useEffect(() => {
+    const card = mobileSupportRef.current;
+    const cta = finalCtaRef.current;
+    if (!card || !cta) return;
+    const cardIo = new IntersectionObserver(([entry]) => {
+      setPastCard(!entry.isIntersecting && entry.boundingClientRect.bottom < 0);
+    });
+    const ctaIo = new IntersectionObserver(([entry]) =>
+      setCtaVisible(entry.isIntersecting),
+    );
+    cardIo.observe(card);
+    ctaIo.observe(cta);
+    return () => {
+      cardIo.disconnect();
+      ctaIo.disconnect();
+    };
+  }, []);
+
   const openSupport = () => setOpen(true);
   const closeSupport = useCallback(() => setOpen(false), []);
 
@@ -592,7 +618,7 @@ export function ChannelProfile({
     ]);
 
   return (
-    <div className="pb-28 lg:pb-0">
+    <div>
       {/* Cover */}
       <div className="mx-auto w-full max-w-6xl px-4 pt-24 sm:px-6 lg:px-10">
         <div
@@ -633,21 +659,6 @@ export function ChannelProfile({
               {channel.description}
             </p>
 
-            <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate">
-              {data.links.map((l) => (
-                <li key={l.label}>
-                  <a
-                    href={l.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`underline-offset-4 transition hover:text-charcoal-deep hover:underline ${focus}`}
-                  >
-                    {l.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-
             <dl className="mt-7 flex gap-8 sm:gap-12">
               {[
                 [formatFollowers(channel.followers), "Followers"],
@@ -663,8 +674,12 @@ export function ChannelProfile({
               ))}
             </dl>
 
-            <div className="mt-7 flex flex-wrap gap-3">
-              <OriginButton type="button" onClick={openSupport} >
+            <div className="mt-7 grid grid-cols-2 gap-3 lg:flex lg:flex-wrap">
+              <OriginButton
+                type="button"
+                onClick={openSupport}
+                className="hidden lg:inline-flex"
+              >
                 <Heart className="size-4" />
                 Support This Channel
               </OriginButton>
@@ -672,15 +687,36 @@ export function ChannelProfile({
                 type="button"
                 aria-pressed={following}
                 onClick={() => setFollowing((f) => !f)}
-                className={`${ghostBtn} ${following ? "bg-mist" : ""}`}
+                className={`inline-flex h-12 items-center justify-center rounded-xl border px-5 text-sm font-semibold transition active:scale-[0.98] ${focus} ${
+                  following
+                    ? "border-charcoal-deep/20 bg-mist text-charcoal-deep"
+                    : "border-charcoal-deep bg-charcoal-deep text-white hover:bg-charcoal-deep/90"
+                }`}
               >
                 {following ? "Following" : "Follow"}
               </button>
-              <button type="button" onClick={share} className={ghostBtn}>
+              <button
+                type="button"
+                onClick={share}
+                className={`inline-flex h-12 items-center justify-center rounded-xl border border-bless bg-cream px-5 text-sm font-semibold text-charcoal-deep transition hover:bg-bless/30 active:scale-[0.98] ${focus}`}
+              >
                 {shared ? "Link copied" : "Share"}
               </button>
             </div>
           </header>
+
+          {/* Inline support card (mobile), above About */}
+          <div
+            ref={mobileSupportRef}
+            className={`${card} mt-10 p-6 shadow-[0_12px_32px_-18px_rgba(23,25,24,0.25)] lg:hidden`}
+          >
+            <SupportForm
+              channel={channel}
+              value={support}
+              onChange={setSupport}
+              onContinue={openSupport}
+            />
+          </div>
 
           <TabBar />
 
@@ -818,7 +854,7 @@ export function ChannelProfile({
       </div>
 
       {/* Final CTA */}
-      <section className="mt-24 overflow-hidden bg-cream py-20 sm:mt-32 sm:py-28">
+      <section ref={finalCtaRef} className="mt-24 overflow-hidden bg-cream py-20 sm:mt-32 sm:py-28">
         <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center px-4 text-center sm:px-6">
           <h2 className="text-3xl font-semibold leading-[1.1] tracking-tight text-charcoal-deep sm:text-4xl lg:text-5xl">
             Found something meaningful here?
@@ -845,7 +881,15 @@ export function ChannelProfile({
       </section>
 
       {/* Mobile sticky CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ivory/95 p-3 backdrop-blur lg:hidden">
+      <div
+        aria-hidden={!showSticky}
+        inert={!showSticky}
+        className={`fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ivory/95 p-3 backdrop-blur transition duration-300 lg:hidden ${
+          showSticky
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-full opacity-0"
+        }`}
+      >
         <OriginButton
           type="button"
           onClick={openSupport}
