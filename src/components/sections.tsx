@@ -244,19 +244,16 @@ const MESSAGES = [
     text: "Your words helped me through a difficult time. Thank you for continuing this work.",
     by: "Sarah",
     tone: "bg-cream",
-    offset: "md:mt-0",
   },
   {
     text: "Keep going. What you're creating matters.",
     by: "Anonymous",
     tone: "bg-white",
-    offset: "md:mt-10",
   },
   {
     text: "Your message found me exactly when I needed it.",
     by: "Daniel",
     tone: "bg-mist",
-    offset: "md:mt-4",
   },
 ];
 
@@ -275,11 +272,11 @@ export function Community() {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-3 md:items-start">
+        <div className="mt-14 grid gap-6 md:grid-cols-3 md:items-stretch">
           {MESSAGES.map((m) => (
             <figure
               key={m.by}
-              className={`rounded-[20px] border border-line p-8 ${m.tone} ${m.offset}`}
+              className={`flex h-full flex-col rounded-[20px] border border-line p-8 ${m.tone}`}
             >
               <svg
                 width="28"
@@ -294,7 +291,7 @@ export function Community() {
               <blockquote className="mt-5 text-lg leading-relaxed text-charcoal-deep">
                 {m.text}
               </blockquote>
-              <figcaption className="mt-6 text-sm font-medium text-slate">
+              <figcaption className="mt-auto pt-6 text-sm font-medium text-slate">
                 — {m.by}
               </figcaption>
             </figure>

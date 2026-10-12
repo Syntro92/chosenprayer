@@ -1,5 +1,3 @@
-import { Footer } from "@/components/footer";
-import { Header } from "@/components/header";
 import {
   Community,
   ExploreChannels,
@@ -14,7 +12,6 @@ export default function Home() {
   return (
     <main>
       <div className="relative h-screen w-full overflow-hidden">
-        <Header />
         <Skiper39 />
       </div>
       <Introduction />
@@ -23,7 +20,6 @@ export default function Home() {
       <Community />
       <WhyChosenPrayer />
       <FinalCta />
-      <Footer />
     </main>
   );
 }

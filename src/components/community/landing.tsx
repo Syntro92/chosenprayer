@@ -5,10 +5,6 @@ import { CrowdIllustration } from "@/components/channels/illustrations";
 import CommunityOrbit, {
   type OrbitItem,
 } from "@/components/ui/builders-community-hero";
-import {
-  JoinCommunityButton,
-  JoinCommunityProvider,
-} from "@/components/community/join-community";
 
 /* ---------- Copy (easy to replace) ---------- */
 const HIGHLIGHTS = [
@@ -29,17 +25,17 @@ const HIGHLIGHTS = [
   },
 ] as const;
 
-// Illustrative only. Not real members, messages or activity.
+// Placeholder content until wired to real data.
 const SAMPLE_MESSAGES = [
-  "Your videos got me through a hard week. Thank you for being here.",
-  "I learned something new today and wanted to say thanks.",
-  "Wishing everyone a gentle, good day. You matter.",
+  { by: "Sarah", text: "Your videos got me through a hard week. Thank you for being here." },
+  { by: "Daniel", text: "I learned something new today and wanted to say thanks." },
+  { by: "Anonymous", text: "Wishing everyone a gentle, good day. You matter." },
 ];
 
 const SAMPLE_ACTIVITY = [
-  { title: "A thank-you note", text: "Members could leave a kind word for a channel that made their day.", icon: "note" },
-  { title: "A warm welcome", text: "New members could be greeted by people who remember being new.", icon: "welcome" },
-  { title: "Something that inspired me", text: "Members could share the work that stayed with them.", icon: "spark" },
+  { title: "A thank-you note", text: "Members leave a kind word for a channel that made their day.", icon: "note" },
+  { title: "A warm welcome", text: "New members are greeted by people who remember being new.", icon: "welcome" },
+  { title: "Something that inspired me", text: "Members share the work that stayed with them.", icon: "spark" },
 ] as const;
 
 // Decorative only: words and icons, no counts or activity claims.
@@ -64,7 +60,6 @@ const AVATAR_TONES = ["bg-cream", "bg-mist", "bg-bless/40", "bg-sage/30", "bg-li
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
 const primaryBtn = `inline-flex h-12 items-center justify-center rounded-xl bg-bless px-6 text-sm font-semibold text-charcoal-deep shadow-sm transition hover:bg-bless-deep active:scale-[0.98] ${focus}`;
-const secondaryBtn = `inline-flex h-12 items-center justify-center rounded-xl border border-charcoal-deep/20 px-6 text-sm font-semibold text-charcoal-deep transition hover:border-charcoal-deep hover:bg-white/60 active:scale-[0.98] ${focus}`;
 const wrap = "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10";
 const eyebrow = "text-xs font-semibold uppercase tracking-[0.2em] text-bless-deep";
 const h2 = "text-3xl font-semibold leading-[1.1] tracking-tight text-charcoal-deep sm:text-4xl lg:text-5xl";
@@ -139,17 +134,9 @@ function Avatar({ tone, className = "size-12" }: { tone: string; className?: str
   );
 }
 
-function SampleTag({ children = "Example" }: { children?: string }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-line bg-ivory px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate">
-      {children}
-    </span>
-  );
-}
-
 export function CommunityLanding() {
   return (
-    <JoinCommunityProvider>
+    <>
       <main className="bg-ivory">
         {/* Hero */}
         <section className="relative overflow-hidden pb-16 pt-32 sm:pb-24 sm:pt-44">
@@ -187,9 +174,8 @@ export function CommunityLanding() {
               className="rise-in mt-9 flex flex-col gap-3 sm:flex-row"
               style={{ "--d": "240ms" } as CSSProperties}
             >
-              <JoinCommunityButton className={primaryBtn} />
-              <Link href="/channels" className={secondaryBtn}>
-                Explore Channels
+              <Link href="/signup" className={primaryBtn}>
+                Join the Community
               </Link>
             </div>
           </div>
@@ -223,46 +209,44 @@ export function CommunityLanding() {
         <section className="border-y border-line bg-white py-24 sm:py-32" aria-labelledby="preview-heading">
           <div className={wrap}>
             <div className="max-w-xl">
-              <span className={eyebrow}>A glimpse ahead</span>
+              <span className={eyebrow}>Inside the community</span>
               <h2 id="preview-heading" className={`mt-4 ${h2}`}>
-                What your community could feel like.
+                What your community feels like.
               </h2>
               <p className="mt-5 text-base leading-relaxed text-slate sm:text-lg">
-                We&apos;re still building this. Everything below is an
-                illustration, not real people or live activity.
+                Kind words, warm welcomes and the work that stays with us,
+                all in one place.
               </p>
             </div>
 
             <div className="mt-12 rounded-[28px] border border-line bg-ivory p-5 sm:p-8">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center">
-                  <ul className="flex -space-x-3" aria-label="Example community members">
+                  <ul className="flex -space-x-3" aria-label="Community members">
                     {AVATAR_TONES.map((tone, i) => (
                       <li key={i} className="rounded-full ring-4 ring-ivory">
                         <Avatar tone={tone} />
                       </li>
                     ))}
                   </ul>
-                  <p className="ml-4 text-sm text-slate">Your future neighbours</p>
+                  <p className="ml-4 text-sm text-slate">Members of the community</p>
                 </div>
-                <SampleTag>Illustration only</SampleTag>
               </div>
 
               <div className="mt-8 grid gap-4 lg:grid-cols-[1.1fr_1fr]">
                 <div className="space-y-3">
                   {SAMPLE_MESSAGES.map((m, i) => (
                     <figure
-                      key={m}
-                      className={`flex items-start gap-3 rounded-2xl border border-line bg-white p-4 sm:p-5 ${i === 1 ? "sm:ml-8" : ""}`}
+                      key={m.by}
+                      className="flex items-start gap-3 rounded-2xl border border-line bg-white p-4 sm:p-5"
                     >
                       <Avatar tone={AVATAR_TONES[(i + 1) % AVATAR_TONES.length]} className="size-10" />
                       <div className="min-w-0">
-                        <figcaption className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-charcoal-deep">Example message</span>
-                          <SampleTag>Sample</SampleTag>
+                        <figcaption className="text-sm font-semibold text-charcoal-deep">
+                          {m.by}
                         </figcaption>
                         <blockquote className="mt-1.5 text-base leading-relaxed text-charcoal-deep/85">
-                          &ldquo;{m}&rdquo;
+                          &ldquo;{m.text}&rdquo;
                         </blockquote>
                       </div>
                     </figure>
@@ -279,7 +263,6 @@ export function CommunityLanding() {
                       <div>
                         <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-charcoal-deep">
                           {a.title}
-                          <SampleTag>Idea</SampleTag>
                         </h3>
                         <p className="mt-1 text-sm leading-relaxed text-slate">{a.text}</p>
                       </div>
@@ -329,13 +312,16 @@ export function CommunityLanding() {
               <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-white/75 sm:text-lg">
                 Join a community that believes kindness grows when we share it.
               </p>
-              <JoinCommunityButton
-                className={`mt-9 inline-flex h-14 items-center justify-center rounded-xl bg-bless px-8 text-base font-semibold text-charcoal-deep shadow-sm transition hover:bg-bless-deep active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal-deep`}
-              />
+              <Link
+                href="/signup"
+                className="mt-9 inline-flex h-14 items-center justify-center rounded-xl bg-bless px-8 text-base font-semibold text-charcoal-deep shadow-sm transition hover:bg-bless-deep active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal-deep"
+              >
+                Join the Community
+              </Link>
             </div>
           </div>
         </section>
       </main>
-    </JoinCommunityProvider>
+    </>
   );
 }

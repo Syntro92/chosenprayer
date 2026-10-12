@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ChannelProfile } from "@/components/channels/channel-profile";
-import { Footer } from "@/components/footer";
-import { Header } from "@/components/header";
 import { CHANNELS, getChannel, getProfileData } from "@/lib/channels";
 
 export function generateStaticParams() {
@@ -34,11 +32,9 @@ export default async function ChannelPage({
 
   return (
     <>
-      <Header />
       <main className="bg-ivory">
         <ChannelProfile channel={channel} data={getProfileData(channel)} />
       </main>
-      <Footer />
     </>
   );
 }

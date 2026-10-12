@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChannelsExplorer } from "@/components/channels/channels-explorer";
 import { CrowdIllustration } from "@/components/channels/illustrations";
-import { Footer } from "@/components/footer";
-import { Header } from "@/components/header";
 
 export const metadata: Metadata = {
   title: "Channels | Chosen Prayer",
@@ -19,7 +17,6 @@ const wrap = "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10";
 export default function ChannelsPage() {
   return (
     <>
-      <Header />
       <main className="bg-ivory">
         {/* Hero */}
         <section className={`${wrap} flex max-w-3xl flex-col items-center pb-12 pt-32 text-center sm:pb-16 sm:pt-44`}>
@@ -77,7 +74,6 @@ export default function ChannelsPage() {
           </div>
         </section>
       </main>
-      <Footer />
     </>
   );
 }

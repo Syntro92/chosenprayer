@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { CrowdIllustration } from "@/components/channels/illustrations";
-import { Footer } from "@/components/footer";
-import { Header } from "@/components/header";
 
 export const metadata: Metadata = {
   title: "About | Chosen Prayer",
@@ -112,7 +110,6 @@ function LineIcon({ name }: { name: string }) {
 export default function AboutPage() {
   return (
     <>
-      <Header />
       <main className="bg-ivory">
         {/* Hero */}
         <section className={`${wrap} flex max-w-4xl flex-col items-center pb-8 pt-32 text-center sm:pt-44`}>
@@ -277,7 +274,6 @@ export default function AboutPage() {
           </div>
         </section>
       </main>
-      <Footer />
     </>
   );
 }

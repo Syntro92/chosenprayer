@@ -176,7 +176,6 @@ export function CommunityFeed() {
         <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex gap-3">
             <button type="button" onClick={shareSomething} className={primaryBtn}>Share Something</button>
-            <Link href="/channels" className={secondaryBtn}>Explore Channels</Link>
           </div>
           <div className="flex items-center gap-3">
             <ul className="flex -space-x-2" aria-label="Sample community members">
