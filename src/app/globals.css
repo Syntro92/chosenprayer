@@ -33,6 +33,16 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* iOS Safari zooms the page when a focused field's font-size is under 16px.
+   Unlayered, so it overrides Tailwind's text-* utilities on small screens. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 /* Hero entrance: each element rises and fades in, staggered via --d. */
 @keyframes rise-in {
   from {
