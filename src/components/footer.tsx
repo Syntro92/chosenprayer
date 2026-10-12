@@ -42,7 +42,7 @@ export function Footer() {
             href="/"
             className={`text-lg font-semibold tracking-tight text-charcoal-deep ${focus}`}
           >
-            Chosen<span className="text-bless-deep"> Bless</span>
+            Chosen<span className="text-bless-deep"> Prayer</span>
           </Link>
           <p className="mt-3 text-sm text-slate">Support what matters.</p>
           <FooterLanguage />
@@ -67,7 +67,7 @@ export function Footer() {
       </div>
       <div className="border-t border-line">
         <p className="mx-auto max-w-6xl px-4 py-6 text-xs text-slate sm:px-6 lg:px-10">
-          © <FooterYear /> Chosen Bless
+          © <FooterYear /> Chosen Prayer
         </p>
       </div>
     </footer>

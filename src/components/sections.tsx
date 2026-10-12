@@ -29,14 +29,14 @@ export function Introduction() {
   return (
     <section className="bg-white py-24 sm:py-32">
       <div className={`${wrap} flex max-w-3xl flex-col items-center text-center`}>
-        <Eyebrow>How Chosen Bless works</Eyebrow>
+        <Eyebrow>How Chosen Prayer works</Eyebrow>
         <Heading>
           Find something meaningful.
           <br />
           Support it.
         </Heading>
         <p className="mt-6 text-base leading-relaxed text-slate sm:text-lg">
-          Chosen Bless connects you with channels, creators and voices that
+          Chosen Prayer connects you with channels, creators and voices that
           bring value to people&apos;s lives. Discover their work, choose who
           you want to support, and give what feels right.
         </p>
@@ -312,7 +312,7 @@ export function Community() {
   );
 }
 
-/* ---------- 05 Why Chosen Bless ---------- */
+/* ---------- 05 Why Chosen Prayer ---------- */
 const PRINCIPLES = [
   {
     title: "Voluntary",
@@ -346,7 +346,7 @@ const PRINCIPLES = [
   },
 ];
 
-export function WhyChosenBless() {
+export function WhyChosenPrayer() {
   return (
     <section className="bg-mist py-24 sm:py-32">
       <div className={wrap}>

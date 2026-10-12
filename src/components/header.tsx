@@ -133,10 +133,10 @@ export function Header() {
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <Link
           href="/"
-          aria-label="Chosen Bless home"
+          aria-label="Chosen Prayer home"
           className={`rounded-xl text-lg font-semibold tracking-tight text-neutral-900 ${focus}`}
         >
-          Chosen<span className="text-amber-500"> Bless</span>
+          Chosen<span className="text-amber-500"> Prayer</span>
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">

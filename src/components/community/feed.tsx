@@ -165,7 +165,7 @@ export function CommunityFeed() {
       {/* Welcome (compact) */}
       <section className="mx-auto w-full max-w-6xl px-4 pb-8 pt-28 sm:px-6 sm:pt-32 lg:px-10">
         <div className="max-w-2xl">
-          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-bless-deep">The Chosen Bless Community</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-bless-deep">The Chosen Prayer Community</span>
           <h1 className="mt-3 text-4xl font-semibold leading-[1.08] tracking-tight text-charcoal-deep sm:text-5xl">
             A little kindness brings us together.
           </h1>

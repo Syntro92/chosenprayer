@@ -108,7 +108,7 @@ export function JoinCommunityProvider({ children }: { children: ReactNode }) {
                 Community
               </span>
               <h2 id={titleId} className="mt-3 pr-8 text-2xl font-semibold tracking-tight sm:text-3xl">
-                Join the Chosen Bless Community
+                Join the Chosen Prayer Community
               </h2>
               <p className="mt-3 text-base leading-relaxed text-slate">
                 Joining means becoming part of a group of people who share

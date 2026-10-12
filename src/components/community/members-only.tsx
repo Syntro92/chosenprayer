@@ -52,7 +52,7 @@ function DefaultGate() {
           This space is for members
         </h1>
         <p className="mt-3 text-base leading-relaxed text-slate">
-          Posts, comments and member profiles are only visible to people in the Chosen Bless
+          Posts, comments and member profiles are only visible to people in the Chosen Prayer
           community. Join to see what everyone is sharing.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">

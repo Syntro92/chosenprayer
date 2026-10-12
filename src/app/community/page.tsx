@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
 
 export const metadata: Metadata = {
-  title: "Community | Chosen Bless",
+  title: "Community | Chosen Prayer",
   description:
     "Share your moments, celebrate others, and connect with people who believe in making a difference.",
 };

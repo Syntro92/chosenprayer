@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Chosen Bless — Admin Overview
+// Chosen Prayer — Admin Overview
 import TotalEarning from './components/TotalEarning.vue'; // Total Support
 import TotalOrder from './components/TotalOrder.vue'; // Live Visitors
 import TotalIncome from './components/TotalIncome.vue'; // This Month + Total Supporters

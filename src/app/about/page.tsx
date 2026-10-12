@@ -6,16 +6,16 @@ import { Footer } from "@/components/footer";
 import { Header } from "@/components/header";
 
 export const metadata: Metadata = {
-  title: "About | Chosen Bless",
+  title: "About | Chosen Prayer",
   description:
-    "Chosen Bless is a place to discover meaningful channels, connect with the work you value, and give something back.",
+    "Chosen Prayer is a place to discover meaningful channels, connect with the work you value, and give something back.",
 };
 
 /* ---------- Copy (easy to replace) ---------- */
 const PURPOSE = [
   "Every day, people create things that inspire, encourage, teach and connect with others.",
   "Sometimes their work means more to us than they know.",
-  "Chosen Bless was created to make it simple for people to support the channels and creators that matter to them — voluntarily, directly and meaningfully.",
+  "Chosen Prayer was created to make it simple for people to support the channels and creators that matter to them — voluntarily, directly and meaningfully.",
 ];
 
 const STEPS = [
@@ -116,7 +116,7 @@ export default function AboutPage() {
       <main className="bg-ivory">
         {/* Hero */}
         <section className={`${wrap} flex max-w-4xl flex-col items-center pb-8 pt-32 text-center sm:pt-44`}>
-          <span className={`${eyebrow} rise-in`}>About Chosen Bless</span>
+          <span className={`${eyebrow} rise-in`}>About Chosen Prayer</span>
           <h1
             className="rise-in mt-5 text-5xl font-semibold leading-[1.04] tracking-tight text-charcoal-deep sm:text-6xl lg:text-7xl"
             style={{ "--d": "80ms" } as CSSProperties}
@@ -142,7 +142,7 @@ export default function AboutPage() {
             className="rise-in mt-7 max-w-2xl text-base leading-relaxed text-slate sm:text-xl"
             style={{ "--d": "160ms" } as CSSProperties}
           >
-            Chosen Bless is a place where people can discover meaningful
+            Chosen Prayer is a place where people can discover meaningful
             channels, connect with the work they value, and give something
             back.
           </p>
@@ -156,7 +156,7 @@ export default function AboutPage() {
           <div className="grid gap-10 border-t border-line pt-12 md:grid-cols-[1fr_1.1fr] md:gap-20 md:pt-16">
             <div>
               <span className={eyebrow}>Our purpose</span>
-              <h2 className={`mt-4 max-w-md ${h2}`}>Why we built Chosen Bless</h2>
+              <h2 className={`mt-4 max-w-md ${h2}`}>Why we built Chosen Prayer</h2>
             </div>
             <div className="space-y-6 text-lg leading-relaxed text-charcoal-deep/80 sm:text-xl">
               {PURPOSE.map((p, i) => (
@@ -193,7 +193,7 @@ export default function AboutPage() {
                 <span className="text-bless">give something back.</span>
               </h2>
               <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-white/75 sm:text-lg">
-                Support doesn&apos;t always have to be complicated. Chosen Bless
+                Support doesn&apos;t always have to be complicated. Chosen Prayer
                 brings people and meaningful work together, giving communities
                 a simple way to show appreciation and help that work continue.
               </p>
@@ -204,7 +204,7 @@ export default function AboutPage() {
         {/* How it works */}
         <section className={`${wrap} mt-24 sm:mt-36`}>
           <div className="max-w-xl">
-            <span className={eyebrow}>How Chosen Bless works</span>
+            <span className={eyebrow}>How Chosen Prayer works</span>
             <h2 className={`mt-4 ${h2}`}>Three simple steps.</h2>
           </div>
           <ol className="mt-12 grid gap-5 md:grid-cols-3">

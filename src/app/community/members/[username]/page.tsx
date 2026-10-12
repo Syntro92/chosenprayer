@@ -5,7 +5,7 @@ import { MemberProfile } from "@/components/community/member-profile";
 import { SAMPLE_MEMBERS } from "@/lib/community/sample-data";
 
 export const metadata: Metadata = {
-  title: "Member | Chosen Bless Community",
+  title: "Member | Chosen Prayer Community",
 };
 
 export function generateStaticParams() {

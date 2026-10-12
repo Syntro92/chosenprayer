@@ -1,4 +1,4 @@
-// Sample data for the Chosen Bless Overview page.
+// Sample data for the Chosen Prayer Overview page.
 // Every export below is shaped like an API response so it can later be replaced by a fetch to the real API/database.
 
 export const palette = {

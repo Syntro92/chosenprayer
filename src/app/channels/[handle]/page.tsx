@@ -18,7 +18,7 @@ export async function generateMetadata({
   const channel = getChannel(handle);
   if (!channel) return {};
   return {
-    title: `${channel.name} | Chosen Bless`,
+    title: `${channel.name} | Chosen Prayer`,
     description: channel.description,
   };
 }

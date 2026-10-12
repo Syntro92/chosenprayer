@@ -5,7 +5,7 @@ import { PostDetail } from "@/components/community/post-detail";
 import { SAMPLE_POSTS } from "@/lib/community/sample-data";
 
 export const metadata: Metadata = {
-  title: "Post | Chosen Bless Community",
+  title: "Post | Chosen Prayer Community",
 };
 
 export function generateStaticParams() {

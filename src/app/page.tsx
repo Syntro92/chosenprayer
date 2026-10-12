@@ -6,7 +6,7 @@ import {
   FinalCta,
   HowItWorks,
   Introduction,
-  WhyChosenBless,
+  WhyChosenPrayer,
 } from "@/components/sections";
 import { Skiper39 } from "@/components/ui/skiper39";
 
@@ -21,7 +21,7 @@ export default function Home() {
       <HowItWorks />
       <ExploreChannels />
       <Community />
-      <WhyChosenBless />
+      <WhyChosenPrayer />
       <FinalCta />
       <Footer />
     </main>
