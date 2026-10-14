@@ -17,6 +17,9 @@ export const CHANNEL_IMAGE_MIME_BY_EXT: Record<string, string> = {
 /** Storage keys are server-generated: channels/<uuid>.<ext>. */
 export const CHANNEL_IMAGE_PATH_RE = /^channels\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 
+/** Landing-page cover (Admin > Settings): hero/<uuid>.<ext> in the same public bucket. */
+export const HERO_IMAGE_PATH_RE = /^hero\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+
 export type Channel = {
   handle: string; // without the leading "@"; also the profile route slug
   name: string;

@@ -34,6 +34,7 @@ export async function uploadChannelImage(
   actor: Actor | null,
   file: { name: string; bytes: Uint8Array },
   store: Pick<typeof channelImages, "upload"> = channelImages,
+  folder: "channels" | "hero" = "channels",
 ): Promise<UploadedChannelImage> {
   requireRole(actor, "admin");
   // .jpeg is the same format as .jpg; store it under one extension.
@@ -43,7 +44,7 @@ export async function uploadChannelImage(
   if (file.bytes.byteLength > CHANNEL_IMAGE_MAX_BYTES) throw bad("The image is larger than 4 MB.");
   if (!matchesType(ext, file.bytes)) throw bad("That file isn't a valid JPG, PNG or WebP image.");
 
-  const path = `channels/${randomUUID()}${ext}`;
+  const path = `${folder}/${randomUUID()}${ext}`;
   await store.upload(path, file.bytes, CHANNEL_IMAGE_MIME_BY_EXT[ext]);
   return { path, url: channelImageUrl(path)! };
 }

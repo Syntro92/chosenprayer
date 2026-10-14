@@ -119,34 +119,42 @@ export interface Analytics {
   giving: { raisedCents: number; donations: number; averageCents: number; series: { date: string; amountCents: number; donations: number }[] };
   /** donations / distinct visitors in the range; null when there is no traffic data yet. */
   conversionRate: number | null;
+  /** Every channel, for the filter dropdown. */
+  channels: { id: string; name: string }[];
+  /** The channel the numbers are limited to, if any. */
+  channel: string | null;
 }
 
 export async function getAnalytics(actor: Actor | null, raw: unknown, conn: Queryable = db): Promise<Analytics> {
   requireRole(actor, "admin");
-  const { range } = analyticsQuerySchema.parse(raw);
+  const { range, channel } = analyticsQuerySchema.parse(raw);
   const days = RANGES[range];
   const since = `current_date - ${days - 1}`;
+  // $1 is the channel id, or null for "all channels".
+  const params = [channel ?? null];
+  const viewsOf = "($1::uuid is null or v.channel_id = $1::uuid)";
+  const givesOf = "($1::uuid is null or d.channel_id = $1::uuid)";
 
   const traffic = (await one<{ views: number; visitors: number }>(
     `select count(*)::int as views, count(distinct visitor_id)::int as visitors
-     from public.page_views where created_at >= ${since} and coalesce(device, '') <> 'bot'`,
-    [],
+     from public.page_views v where created_at >= ${since} and coalesce(device, '') <> 'bot' and ${viewsOf}`,
+    params,
     conn,
   ))!;
   const viewsSeries = await rows<{ date: string; views: number; visitors: number }>(
     `select to_char(day, 'YYYY-MM-DD') as date, count(v.id)::int as views, count(distinct v.visitor_id)::int as visitors
      from generate_series(${since}, current_date, interval '1 day') day
-     left join public.page_views v on v.created_at >= day and v.created_at < day + interval '1 day' and coalesce(v.device, '') <> 'bot'
+     left join public.page_views v on v.created_at >= day and v.created_at < day + interval '1 day' and coalesce(v.device, '') <> 'bot' and ${viewsOf}
      group by day order by day`,
-    [],
+    params,
     conn,
   );
   const group = (col: string, alias: string, limit = 8) =>
     rows<{ k: string; views: number }>(
       `select coalesce(nullif(${col}, ''), '(none)') as k, count(*)::int as views
-       from public.page_views where created_at >= ${since} and coalesce(device, '') <> 'bot'
+       from public.page_views v where created_at >= ${since} and coalesce(device, '') <> 'bot' and ${viewsOf}
        group by 1 order by views desc, k limit ${limit}`,
-      [],
+      params,
       conn,
     ).then((r) => r.map((x) => ({ [alias]: x.k, views: x.views })));
   const [pages, referrers, devices, countries] = await Promise.all([
@@ -158,18 +166,19 @@ export async function getAnalytics(actor: Actor | null, raw: unknown, conn: Quer
 
   const giving = (await one<{ raised: number; donations: number }>(
     `select coalesce(sum(d.amount_cents), 0)::bigint as raised, count(*)::int as donations
-     from public.donations d where ${KEPT} and d.paid_at >= ${since}`,
-    [],
+     from public.donations d where ${KEPT} and d.paid_at >= ${since} and ${givesOf}`,
+    params,
     conn,
   ))!;
   const givingSeries = await rows<{ date: string; amount: number; donations: number }>(
     `select to_char(day, 'YYYY-MM-DD') as date, coalesce(sum(d.amount_cents), 0)::bigint as amount, count(d.id)::int as donations
      from generate_series(${since}, current_date, interval '1 day') day
-     left join public.donations d on d.status = 'succeeded' and d.paid_at >= day and d.paid_at < day + interval '1 day'
+     left join public.donations d on d.status = 'succeeded' and d.paid_at >= day and d.paid_at < day + interval '1 day' and ${givesOf}
      group by day order by day`,
-    [],
+    params,
     conn,
   );
+  const channels = await rows<{ id: string; name: string }>("select id, name from public.channels order by name", [], conn);
 
   return {
     range,
@@ -186,6 +195,8 @@ export async function getAnalytics(actor: Actor | null, raw: unknown, conn: Quer
       series: givingSeries.map((s) => ({ date: s.date, amountCents: s.amount, donations: s.donations })),
     },
     conversionRate: traffic.visitors ? Math.round((giving.donations / traffic.visitors) * 1000) / 10 : null,
+    channels,
+    channel: channel ?? null,
   };
 }
 

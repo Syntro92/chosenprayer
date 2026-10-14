@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { CoverPhoto, TONE_CLASS } from "@/components/channels/illustrations";
 import { formatFollowers } from "@/lib/channels";
 import { listChannelsPublic } from "@/server/cache/channels";
+import { getBlessingsCountCached } from "@/server/cache/site";
 
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
@@ -241,10 +242,8 @@ const MESSAGES = [
   },
 ];
 
-// Placeholder until wired to real data.
-const BLESSINGS_SHARED = "1,284";
-
-export function Community() {
+export async function Community() {
+  const blessingsShared = await getBlessingsCountCached();
   return (
     <section className="bg-white pb-24 sm:pb-32">
       <div className={wrap}>
@@ -284,7 +283,7 @@ export function Community() {
 
         <p className="mt-12 text-center text-sm text-slate">
           <span className="font-semibold text-charcoal-deep">
-            {BLESSINGS_SHARED}
+            {blessingsShared.toLocaleString("en-US")}
           </span>{" "}
           blessings shared
         </p>

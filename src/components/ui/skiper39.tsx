@@ -283,10 +283,21 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
   );
 };
 
-const Skiper39 = () => {
+/** `coverUrl` is the admin-chosen wallpaper; without it the animated crowd on the default background shows. */
+const Skiper39 = ({ coverUrl = null }: { coverUrl?: string | null }) => {
+  const cover = !!coverUrl;
   return (
     <div className="relative h-full w-full text-black">
-      <div className="absolute inset-x-0 top-28 z-10 mx-auto flex max-w-5xl flex-col items-center px-6 text-center text-neutral-900 sm:top-32">
+      {cover && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" fetchPriority="high" />
+          <div className="absolute inset-0 bg-neutral-950/55" aria-hidden />
+          {/* keeps the (dark-text) site header readable over any wallpaper */}
+          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/90 to-transparent" aria-hidden />
+        </>
+      )}
+      <div className={`absolute inset-x-0 top-28 z-10 mx-auto flex max-w-5xl flex-col items-center px-6 text-center sm:top-32 ${cover ? "text-white" : "text-neutral-900"}`}>
         <span style={{ "--d": "0ms" } as React.CSSProperties} className="rise-in text-xs font-semibold uppercase tracking-[0.2em] text-amber-600 sm:text-sm">
           Support what matters
         </span>
@@ -295,7 +306,7 @@ const Skiper39 = () => {
           <br />
           Make a difference.
         </h1>
-        <p style={{ "--d": "320ms" } as React.CSSProperties} className="rise-in mt-6 max-w-2xl text-lg leading-relaxed text-neutral-600 sm:text-xl">
+        <p style={{ "--d": "320ms" } as React.CSSProperties} className={`rise-in mt-6 max-w-2xl text-lg leading-relaxed sm:text-xl ${cover ? "text-neutral-100" : "text-neutral-600"}`}>
           Discover people and channels that inspire you.
           <br className="hidden sm:block" /> If their work means something to
           you, give something back.
@@ -314,17 +325,19 @@ const Skiper39 = () => {
             Community
           </a>
         </div>
-        <p style={{ "--d": "640ms" } as React.CSSProperties} className="rise-in mt-10 text-base italic text-neutral-500">
+        <p style={{ "--d": "640ms" } as React.CSSProperties} className={`rise-in mt-10 text-base italic ${cover ? "text-neutral-200" : "text-neutral-500"}`}>
           Every blessing starts with someone who cares.
         </p>
       </div>
-      <div className="absolute bottom-0 h-full w-screen">
-        <CrowdCanvas
-          src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png"
-          rows={15}
-          cols={7}
-        />
-      </div>
+      {!cover && (
+        <div className="absolute bottom-0 h-full w-screen">
+          <CrowdCanvas
+            src="https://cdn.21st.dev/assets/localized/abdb8990a7bef8c2f5af3e45f0a3c969c4b0603fba8be92e81347de4ea4e1ed7.png"
+            rows={15}
+            cols={7}
+          />
+        </div>
+      )}
     </div>
   );
 };

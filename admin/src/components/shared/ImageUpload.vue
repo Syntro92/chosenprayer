@@ -12,6 +12,8 @@ const props = defineProps<{
   /** Public URL for the current image (shown as the preview). */
   url: string | null;
   shape: 'avatar' | 'cover';
+  /** Upload endpoint under /api/admin (defaults to the channel-image one). */
+  uploadPath?: string;
 }>();
 const emit = defineEmits<{ (e: 'change', value: { path: string | null; url: string | null }): void }>();
 
@@ -39,7 +41,7 @@ async function onPick(e: Event) {
   try {
     const form = new FormData();
     form.append('file', file);
-    const res = await api.upload<{ path: string; url: string }>('/channels/images', form);
+    const res = await api.upload<{ path: string; url: string }>(props.uploadPath ?? '/channels/images', form);
     emit('change', { path: res.path, url: res.url });
   } catch (err) {
     error.value = err instanceof ApiError && err.fields.file ? err.fields.file : errorMessage(err);
@@ -85,8 +87,8 @@ async function onPick(e: Event) {
   border-radius: 50%;
 }
 .image-upload-preview.is-cover {
-  width: 220px;
-  height: 100px;
+  width: 240px;
+  aspect-ratio: 16 / 9;
   border-radius: 8px;
 }
 .image-upload-preview img {

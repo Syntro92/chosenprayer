@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CHANNEL_IMAGE_PATH_RE } from "../channels";
+import { CHANNEL_IMAGE_PATH_RE, HERO_IMAGE_PATH_RE } from "../channels";
 import { displayNameField, emailField, passwordField } from "./accounts";
 
 // Admin API inputs. Validated again on the server; the Vue panel may reuse the shapes.
@@ -130,10 +130,16 @@ export const settingsSchema = z.object({
   contactEmail: z.preprocess((v) => (v === "" ? null : v), z.string().trim().email("Enter a valid email").max(254).nullable()),
   defaultCurrency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Use a 3-letter currency code"),
   notifyOnDonation: z.boolean(),
+  /** Landing-page cover key from the upload step; null = back to the default; omitted = unchanged. */
+  heroImagePath: z.string().regex(HERO_IMAGE_PATH_RE, "Upload the image again").nullable().optional(),
 });
 
 export const RANGES = { "7d": 7, "30d": 30, "90d": 90 } as const;
-export const analyticsQuerySchema = z.object({ range: z.enum(["7d", "30d", "90d"]).default("30d") });
+export const analyticsQuerySchema = z.object({
+  range: z.enum(["7d", "30d", "90d"]).default("30d"),
+  /** Limit traffic and giving to one channel (its id). */
+  channel: optional(z.string().uuid()),
+});
 
 export const auditQuerySchema = z.object({
   entityType: optional(z.enum(["post", "comment", "report", "user", "donation", "channel", "setting"])),

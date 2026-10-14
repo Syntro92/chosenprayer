@@ -12,16 +12,15 @@ const COLUMNS = [
     links: [
       { label: "Channels", href: "/channels" },
       { label: "Community", href: "/community" },
-      { label: "How It Works", href: "/how-it-works" },
       { label: "About", href: "/about" },
       { label: "Contact", href: "/contact" },
     ],
   },
   {
-    title: "For creators",
+    title: "Account",
     links: [
-      { label: "Start a Channel", href: "/start" },
       { label: "Sign In", href: "/signin" },
+      { label: "Sign Up", href: "/signup" },
     ],
   },
   {

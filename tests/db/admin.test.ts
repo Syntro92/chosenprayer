@@ -390,6 +390,22 @@ describe("settings", () => {
       expect(await invalid(updateSettings(a, { siteName: "x", contactEmail: "not-an-email", defaultCurrency: "USD", notifyOnDonation: true }, c))).toMatchObject({ code: "VALIDATION" });
       expect(await invalid(updateSettings(a, { siteName: "x", contactEmail: "", defaultCurrency: "DOLLARS", notifyOnDonation: true }, c))).toMatchObject({ code: "VALIDATION" });
     }));
+
+  it("sets the landing-page cover, keeps it when omitted, and rejects keys that are not hero uploads", () =>
+    withRollback(async (c) => {
+      const a = await admin(c);
+      const base = { siteName: "Chosen Prayer QA", contactEmail: "", defaultCurrency: "USD", notifyOnDonation: true };
+      const key = `hero/${randomUUID()}.webp`;
+      const set = await updateSettings(a, { ...base, heroImagePath: key }, c);
+      expect(set.heroImagePath).toBe(key);
+      expect(set.heroImageUrl).toContain(`/channel-images/${key}`);
+      expect((await listAuditLog(a, { entityType: "setting" }, c)).items[0].metadata.fields).toContain("heroImagePath");
+      // saving the form without the field leaves the cover alone
+      expect((await updateSettings(a, base, c)).heroImagePath).toBe(key);
+      for (const bad of [`channels/${randomUUID()}.webp`, "hero/../x.png", "https://evil.example/x.png"]) {
+        expect(await invalid(updateSettings(a, { ...base, heroImagePath: bad }, c))).toMatchObject({ code: "VALIDATION" });
+      }
+    }));
 });
 
 describe("dashboard, analytics, live and health", () => {

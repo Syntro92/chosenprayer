@@ -14,22 +14,25 @@ interface Analytics {
   countries: { country: string; views: number }[];
   giving: { raisedCents: number; donations: number; averageCents: number; series: { date: string; amountCents: number; donations: number }[] };
   conversionRate: number | null;
+  channels: { id: string; name: string }[];
+  channel: string | null;
 }
 
 const range = ref<'7d' | '30d' | '90d'>('30d');
+const channel = ref('');
 const data = ref<Analytics | null>(null);
 const loading = ref(true);
 const error = ref('');
 let seq = 0;
 
 watch(
-  range,
+  [range, channel],
   async () => {
     const mine = ++seq;
     loading.value = true;
     error.value = '';
     try {
-      const res = await api.get<Analytics>('/analytics', { range: range.value });
+      const res = await api.get<Analytics>('/analytics', { range: range.value, channel: channel.value });
       if (mine === seq) data.value = res;
     } catch (e) {
       if (mine === seq) error.value = errorMessage(e);
@@ -40,6 +43,7 @@ watch(
   { immediate: true }
 );
 
+const channelItems = computed(() => [{ title: 'All channels', value: '' }, ...(data.value?.channels ?? []).map((c) => ({ title: c.name, value: c.id }))]);
 const short = (d: string) => d.slice(5);
 const givingOptions = computed(() => ({
   chart: { toolbar: { show: false }, fontFamily: 'inherit' },
@@ -66,7 +70,16 @@ const noTraffic = computed(() => !!data.value && data.value.traffic.views === 0)
 
 <template>
   <BaseBreadcrumb title="Analytics" :breadcrumbs="[{ title: 'Main', disabled: false, href: '#' }, { title: 'Analytics', disabled: true, href: '#' }]" />
-  <div class="mb-4">
+  <div class="mb-4 d-flex flex-wrap align-center ga-3">
+    <v-select
+      v-model="channel"
+      :items="channelItems"
+      label="Channel"
+      density="comfortable"
+      variant="outlined"
+      hide-details
+      style="max-width: 280px; min-width: 200px"
+    />
     <v-btn-toggle v-model="range" mandatory density="comfortable" color="primary" variant="outlined" divided>
       <v-btn value="7d">7 days</v-btn>
       <v-btn value="30d">30 days</v-btn>
@@ -92,7 +105,7 @@ const noTraffic = computed(() => !!data.value && data.value.traffic.views === 0)
     </v-col>
     <v-col cols="12" lg="6">
       <UiParentCard :title="`Traffic · ${data.traffic.views.toLocaleString()} views, ${data.traffic.visitors.toLocaleString()} visitors`">
-        <v-alert v-if="noTraffic" type="info" variant="tonal" class="mb-3">No page views recorded yet. Visitor tracking is switched on in the next milestone.</v-alert>
+        <v-alert v-if="noTraffic" type="info" variant="tonal" class="mb-3">{{ channel ? 'No page views recorded for this channel in this period.' : 'No page views recorded yet.' }}</v-alert>
         <apexchart type="area" height="300" :options="trafficOptions" :series="trafficSeries" />
       </UiParentCard>
     </v-col>
