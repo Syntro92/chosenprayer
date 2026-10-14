@@ -1,32 +1,50 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { MembersOnly } from "@/components/community/members-only";
+import { CommunityProvider } from "@/components/community/community-provider";
+import { MembersGate } from "@/components/community/members-gate";
 import { PostDetail } from "@/components/community/post-detail";
-import { SAMPLE_POSTS } from "@/lib/community/sample-data";
+import { hasRole } from "@/server/auth/policy";
+import { getActor } from "@/server/auth/session";
+import { listComments } from "@/server/services/comments";
+import { getPost, getViewer } from "@/server/services/posts";
 
 export const metadata: Metadata = {
   title: "Post | Chosen Prayer Community",
 };
 
-export function generateStaticParams() {
-  return SAMPLE_POSTS.map((p) => ({ postId: p.id }));
-}
-
 async function Content({ params }: { params: Promise<{ postId: string }> }) {
   const { postId } = await params;
+  const actor = await getActor();
+  if (!actor || actor.status !== "active") return <MembersGate next={`/community/posts/${postId}`} />;
+
+  let data;
+  try {
+    data = await Promise.all([getViewer(actor), getPost(actor, postId), listComments(actor, postId)]);
+  } catch (e) {
+    if ((e as { code?: string } | null)?.code === "NOT_FOUND") notFound();
+    throw e;
+  }
+  const [viewer, { post, members }, thread] = data;
   return (
-    <MembersOnly>
-      <PostDetail postId={postId} />
-    </MembersOnly>
+    <CommunityProvider
+      session={{ user: viewer, isModerator: hasRole(actor, "moderator"), isAdmin: hasRole(actor, "admin") }}
+      initial={{
+        posts: [post],
+        comments: thread.comments,
+        commentsLoadedFor: [post.id],
+        members: [...members, ...thread.members],
+      }}
+    >
+      <PostDetail postId={post.id} />
+    </CommunityProvider>
   );
 }
 
 export default function PostPage({ params }: { params: Promise<{ postId: string }> }) {
   return (
-    <>
-      <Suspense fallback={<main className="min-h-screen bg-ivory" />}>
-        <Content params={params} />
-      </Suspense>
-    </>
+    <Suspense fallback={<main className="min-h-screen bg-ivory" />}>
+      <Content params={params} />
+    </Suspense>
   );
 }

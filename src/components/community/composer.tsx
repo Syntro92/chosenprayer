@@ -89,7 +89,7 @@ export function Composer() {
   const canPublish = (trimmed.length > 0 || drafts.length > 0) && !tooLong && !busy;
 
   const open = () => {
-    if (requireAuth(() => setComposerOpen(true))) setComposerOpen(true);
+    if (requireAuth()) setComposerOpen(true);
   };
 
   if (!composerOpen) {

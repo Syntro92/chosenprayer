@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LANGUAGES } from "@/lib/languages";
+import { setLanguage, useLanguage } from "@/lib/language-store";
 
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
@@ -9,7 +10,7 @@ const focus =
 /** Language dropdown for the footer. Opens upwards so it never runs off the page. */
 export function FooterLanguage() {
   const [open, setOpen] = useState(false);
-  const [lang, setLang] = useState(LANGUAGES[0]);
+  const lang = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export function FooterLanguage() {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative mt-6 inline-block">
+    <div ref={ref} translate="no" className="relative mt-6 inline-block">
       <button
         type="button"
         aria-haspopup="listbox"
@@ -72,7 +73,7 @@ export function FooterLanguage() {
               type="button"
               tabIndex={open ? 0 : -1}
               onClick={() => {
-                setLang(l);
+                setLanguage(l);
                 setOpen(false);
               }}
               className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-mist ${focus} ${

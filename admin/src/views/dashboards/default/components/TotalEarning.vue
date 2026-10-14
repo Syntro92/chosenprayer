@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { shallowRef } from 'vue';
+import { computed, shallowRef } from 'vue';
 import { ArchiveIcon, CopyIcon, DownloadIcon, FileExportIcon } from 'vue-tabler-icons';
 import iconCard from '@/assets/images/icons/icon-card.svg';
-import { summary, money } from '../overviewData';
+import { change, money } from '@/utils/format';
+import { useDashboard } from '../useDashboard';
+
+const { dashboard } = useDashboard();
 const items = shallowRef([
   { title: 'Import Card', icon: DownloadIcon },
   { title: 'Copy Data', icon: CopyIcon },
   { title: 'Export', icon: FileExportIcon },
   { title: 'Archive File', icon: ArchiveIcon }
 ]);
-const s = summary.totalSupport;
+const total = computed(() => money(dashboard.value?.totals.raisedCents ?? 0, dashboard.value?.currency));
+const pct = computed(() => (dashboard.value ? change(dashboard.value.month.raisedCents, dashboard.value.month.previousCents) : null));
+const pctText = computed(() => (pct.value === null ? 'No earlier month to compare' : (pct.value >= 0 ? '+' : '') + pct.value + '% vs last month'));
 </script>
 
 <template>
@@ -40,11 +45,11 @@ const s = summary.totalSupport;
         </div>
       </div>
       <h2 class="text-h1 font-weight-medium">
-        {{ money(s.value) }} <a href="#"><CircleArrowUpRightIcon stroke-width="1.5" width="28" class="text-white" /> </a>
+        {{ total }} <a href="#"><CircleArrowUpRightIcon stroke-width="1.5" width="28" class="text-white" /> </a>
       </h2>
       <div class="text-subtitle-1 text-white">Total Support</div>
-      <div class="text-caption text-white" style="opacity: 0.8">Total received</div>
-      <div class="text-subtitle-2 text-white mt-2 font-weight-medium">+{{ s.changePct }}% {{ s.period }}</div>
+      <div class="text-caption text-white" style="opacity: 0.8">{{ dashboard?.totals.donations ?? 0 }} completed gifts</div>
+      <div class="text-subtitle-2 text-white mt-2 font-weight-medium">{{ pctText }}</div>
     </v-card-text>
   </v-card>
 </template>

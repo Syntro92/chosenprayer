@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ChannelProfile } from "@/components/channels/channel-profile";
-import { CHANNELS, getChannel, getProfileData } from "@/lib/channels";
-
-export function generateStaticParams() {
-  return CHANNELS.map((c) => ({ handle: c.handle }));
-}
+import { getChannelProfilePublic } from "@/server/cache/channels";
 
 export async function generateMetadata({
   params,
@@ -13,11 +9,11 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const { handle } = await params;
-  const channel = getChannel(handle);
-  if (!channel) return {};
+  const profile = await getChannelProfilePublic(handle);
+  if (!profile) return {};
   return {
-    title: `${channel.name} | Chosen Prayer`,
-    description: channel.description,
+    title: `${profile.channel.name} | Chosen Prayer`,
+    description: profile.channel.description,
   };
 }
 
@@ -27,13 +23,13 @@ export default async function ChannelPage({
   params: Promise<{ handle: string }>;
 }) {
   const { handle } = await params;
-  const channel = getChannel(handle);
-  if (!channel) notFound();
+  const profile = await getChannelProfilePublic(handle);
+  if (!profile) notFound();
 
   return (
     <>
       <main className="bg-ivory">
-        <ChannelProfile channel={channel} data={getProfileData(channel)} />
+        <ChannelProfile channel={profile.channel} data={profile.data} />
       </main>
     </>
   );

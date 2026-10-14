@@ -11,6 +11,11 @@ const PublicRoutes = {
       component: () => import('@/views/authentication/LoginPage.vue')
     },
     {
+      name: 'Change Password',
+      path: '/change-password',
+      component: () => import('@/views/authentication/ChangePasswordPage.vue')
+    },
+    {
       name: 'Login',
       path: '/login1',
       component: () => import('@/views/authentication/auth/LoginPage.vue')

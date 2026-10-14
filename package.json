@@ -9,26 +9,50 @@
     "lint": "eslint",
     "admin:install": "npm --prefix admin ci",
     "admin:build": "cd admin && npx vite build --base=/admin/ --outDir ../public/admin --emptyOutDir",
-    "admin:dev": "cd admin && npx vite --base=/admin/"
+    "admin:dev": "cd admin && npx vite --base=/admin/",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs up",
+    "db:status": "node --env-file=.env scripts/migrate.mjs status",
+    "db:check": "node --env-file=.env scripts/db-check.mjs",
+    "db:smoke": "node --env-file=.env scripts/db-smoke.mjs",
+    "test": "vitest run",
+    "email:test": "node --env-file=.env --env-file=.env.local scripts/email-test.mjs",
+    "test:watch": "vitest",
+    "admin:create": "node --env-file=.env scripts/create-admin.mjs",
+    "db:seed:demo": "node --env-file=.env scripts/seed-demo.mjs"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^7.0.0",
+    "@stripe/stripe-js": "^10.1.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.3",
     "clsx": "^2.1.1",
     "gsap": "^3.15.0",
     "lucide-react": "^1.54.0",
     "motion": "^14.0.0",
     "next": "16.4.0",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "tailwind-merge": "^3.7.0"
+    "server-only": "^0.0.1",
+    "stripe": "^23.0.0",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.4"
   }
 }

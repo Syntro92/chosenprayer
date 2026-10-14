@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useRef, useState } from "react";
-import { Heart, Pencil, Reply, Send, Trash2 } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Ban, Flag, Heart, Pencil, Reply, Send, ShieldX, Trash2 } from "lucide-react";
 import { LIMITS } from "@/lib/community/config";
 import { formatAge } from "@/lib/community/format";
 import type { Comment } from "@/lib/community/types";
 import { useCommunity } from "./community-provider";
-import { ConfirmDialog } from "./dialogs";
+import { ConfirmDialog, ReasonDialog, ReportDialog } from "./dialogs";
 import { ActionMenu, Avatar, CharCounter, EmptyState, focus, type MenuItem } from "./ui";
 
 function CommentForm({
@@ -42,7 +42,7 @@ function CommentForm({
     return (
       <button
         type="button"
-        onClick={() => requireAuth(() => setTimeout(() => input.current?.focus(), 50))}
+        onClick={() => requireAuth()}
         className={`h-11 w-full rounded-xl border border-line bg-ivory px-4 text-left text-sm text-slate hover:border-slate/50 ${focus}`}
       >
         Sign in to write a comment…
@@ -125,10 +125,11 @@ function CommentForm({
 }
 
 function CommentItem({ c, replies, isReply }: { c: Comment; replies: Comment[]; isReply?: boolean }) {
-  const { getMember, user, isModerator, ageOf, likedComments, toggleCommentLike, removeComment } = useCommunity();
+  const { getMember, user, isModerator, isAdmin, ageOf, likedComments, toggleCommentLike, removeComment, blockMember, reportComment, requireAuth } = useCommunity();
   const [editing, setEditing] = useState(false);
   const [replying, setReplying] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [dialog, setDialog] = useState<null | "remove" | "report" | "block">(null);
   const [busy, setBusy] = useState(false);
   const author = getMember(c.authorId);
   if (!author) return null;
@@ -139,8 +140,14 @@ function CommentItem({ c, replies, isReply }: { c: Comment; replies: Comment[]; 
   if (mine) {
     items.push({ label: "Edit comment", icon: <Pencil size={15} />, onSelect: () => setEditing(true) });
     items.push({ label: "Delete comment", icon: <Trash2 size={15} />, onSelect: () => setConfirm(true), danger: true });
-  } else if (isModerator) {
-    items.push({ label: "Remove comment", icon: <Trash2 size={15} />, onSelect: () => setConfirm(true), danger: true });
+  } else {
+    items.push({ label: "Report comment", icon: <Flag size={15} />, onSelect: () => { if (requireAuth()) setDialog("report"); } });
+    if (isModerator) {
+      items.push({ label: "Remove comment (moderator)", icon: <ShieldX size={15} />, onSelect: () => setDialog("remove"), danger: true });
+    }
+    if (isAdmin) {
+      items.push({ label: `Block ${author.name}`, icon: <Ban size={15} />, onSelect: () => setDialog("block"), danger: true });
+    }
   }
 
   return (
@@ -221,29 +228,54 @@ function CommentItem({ c, replies, isReply }: { c: Comment; replies: Comment[]; 
       </div>
       <ConfirmDialog
         open={confirm}
-        title={mine ? "Delete this comment?" : "Remove this comment?"}
-        text={
-          replies.length
-            ? "This will also remove its replies. This can't be undone."
-            : "This can't be undone."
-        }
-        confirmLabel={mine ? "Delete" : "Remove"}
+        title="Delete this comment?"
+        text={replies.length ? "This will also remove its replies. This can't be undone." : "This can't be undone."}
+        confirmLabel="Delete"
         busy={busy}
         onClose={() => setConfirm(false)}
         onConfirm={async () => {
           setBusy(true);
-          await removeComment(c.id, !mine);
+          await removeComment(c.id);
           setBusy(false);
           setConfirm(false);
         }}
+      />
+      <ReasonDialog
+        open={dialog === "remove"}
+        title="Remove this comment?"
+        text="The comment and its replies disappear for everyone. The author is told the reason you give, and the action is logged."
+        confirmLabel="Remove comment"
+        onClose={() => setDialog(null)}
+        onSubmit={(reason) => removeComment(c.id, true, reason)}
+      />
+      <ReasonDialog
+        open={dialog === "block"}
+        title={`Block ${author.name}?`}
+        text="They are signed out and can't sign in, post or comment until an admin lifts the block. Their existing content stays visible; remove it separately. The reason is kept in the audit log."
+        confirmLabel="Block member"
+        placeholder="Reason (kept in the audit log)"
+        onClose={() => setDialog(null)}
+        onSubmit={(reason) => blockMember(c.authorId, reason)}
+      />
+      <ReportDialog
+        subject="comment"
+        open={dialog === "report"}
+        onClose={() => setDialog(null)}
+        onSubmit={(reason, note) => reportComment(c.id, reason, note)}
       />
     </li>
   );
 }
 
 export function Comments({ postId, autoFocus }: { postId: string; autoFocus?: boolean }) {
-  const { comments } = useCommunity();
+  const { comments, ensureComments } = useCommunity();
   const [showAll, setShowAll] = useState(false);
+
+  // Comments are fetched when a post's panel first opens (the feed only carries counts).
+  useEffect(() => {
+    void ensureComments(postId);
+  }, [postId, ensureComments]);
+
   const forPost = comments.filter((c) => c.postId === postId);
   const top = forPost.filter((c) => !c.parentId);
   const hidden = showAll ? 0 : Math.max(0, top.length - LIMITS.commentsPreview);

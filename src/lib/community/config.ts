@@ -1,6 +1,6 @@
 /**
- * Community configuration. These limits are for the UI only.
- * A real backend MUST re-validate type, size, count and permissions.
+ * Community configuration. The UI uses these for instant feedback; the server
+ * re-validates everything (type, size, count, permissions) with the same numbers.
  */
 export const LIMITS = {
   maxFileBytes: 5 * 1024 * 1024, // 5 MB per file
@@ -12,8 +12,23 @@ export const LIMITS = {
   commentsPreview: 2,
 } as const;
 
+/** Private Supabase Storage bucket holding post attachments. */
+export const ATTACHMENT_BUCKET = "community-attachments";
+
 export const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif"] as const;
 export const FILE_EXTS = [".pdf", ".txt", ".docx"] as const;
+
+/** The one MIME type each extension may carry. The server decides the type from the extension. */
+export const MIME_BY_EXT: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
 
 const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const FILE_MIMES = [

@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ChannelsExplorer } from "@/components/channels/channels-explorer";
 import { CrowdIllustration } from "@/components/channels/illustrations";
+import {
+  getCategoriesCached,
+  getFeaturedChannelCached,
+  listChannelsPublic,
+} from "@/server/cache/channels";
 
 export const metadata: Metadata = {
   title: "Channels | Chosen Prayer",
@@ -13,6 +19,16 @@ const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
 const primaryBtn = `inline-flex h-12 items-center justify-center rounded-xl bg-bless px-6 text-sm font-semibold text-charcoal-deep shadow-sm transition hover:bg-bless-deep active:scale-[0.98] ${focus}`;
 const wrap = "mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10";
+
+/** First page of the directory, rendered on the server from cached data. */
+async function Directory() {
+  const [categories, featured, initial] = await Promise.all([
+    getCategoriesCached(),
+    getFeaturedChannelCached(),
+    listChannelsPublic({ sort: "popular", featured: "exclude", limit: 6 }),
+  ]);
+  return <ChannelsExplorer categories={categories} featured={featured} initial={initial} />;
+}
 
 export default function ChannelsPage() {
   return (
@@ -32,7 +48,9 @@ export default function ChannelsPage() {
           </p>
         </section>
 
-        <ChannelsExplorer />
+        <Suspense fallback={<div className="mx-auto mt-10 h-96 w-full max-w-4xl animate-pulse rounded-2xl bg-white/60" />}>
+          <Directory />
+        </Suspense>
 
         {/* Community message */}
         <section className={`${wrap} mt-24 sm:mt-32`}>

@@ -1,19 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { computed } from 'vue';
 import { UsersIcon } from 'vue-tabler-icons';
-import { summary, visitorActivity } from '../overviewData';
+import { useDashboard } from '../useDashboard';
 
-const tab = ref<'30m' | '1h' | '24h'>('30m');
-const visitors = ref(summary.liveVisitors.value);
-
-// Simulated live update every 5s. Replace with a real-time API / websocket later.
-let timer: number | undefined;
-onMounted(() => {
-  timer = window.setInterval(() => {
-    visitors.value = Math.max(0, visitors.value + Math.round((Math.random() - 0.45) * 8));
-  }, 5000);
-});
-onUnmounted(() => window.clearInterval(timer));
+const { live } = useDashboard();
+const visitors = computed(() => live.value?.online ?? 0);
 
 const chartOptions = {
   chart: { type: 'area', height: 90, fontFamily: 'inherit', foreColor: '#a1aab2', sparkline: { enabled: true } },
@@ -21,9 +12,9 @@ const chartOptions = {
   colors: ['#fff'],
   fill: { type: 'gradient', gradient: { opacityFrom: 0.35, opacityTo: 0 } },
   stroke: { curve: 'smooth', width: 2 },
-  tooltip: { theme: 'light', fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: () => 'Visitors' } }, marker: { show: false } }
+  tooltip: { theme: 'light', fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: () => 'Visitors ' } }, marker: { show: false } }
 };
-const series = computed(() => [{ name: 'Visitors', data: visitorActivity[tab.value] }]);
+const series = computed(() => [{ name: 'Visitors', data: live.value?.hourly ?? [] }]);
 </script>
 
 <template>
@@ -33,19 +24,13 @@ const series = computed(() => [{ name: 'Visitors', data: visitorActivity[tab.val
         <v-btn icon rounded="sm" color="darkprimary" variant="flat">
           <UsersIcon stroke-width="1.5" width="20" />
         </v-btn>
-        <div class="ml-auto z-1">
-          <v-tabs v-model="tab" class="theme-tab" density="compact" align-tabs="end">
-            <v-tab value="30m" hide-slider color="transparent">30 Min</v-tab>
-            <v-tab value="1h" hide-slider color="transparent">1 Hour</v-tab>
-            <v-tab value="24h" hide-slider color="transparent">24 Hours</v-tab>
-          </v-tabs>
-        </div>
+        <div class="ml-auto z-1 text-caption text-white" style="opacity: 0.8">Last 24 hours</div>
       </div>
       <v-row class="z-1">
         <v-col cols="6">
           <h2 class="text-h1 font-weight-medium">{{ visitors }}</h2>
           <div class="text-subtitle-1 text-white">Live Visitors</div>
-          <div class="live-now text-caption text-white mt-1"><span class="live-dot" />Live now</div>
+          <div class="live-now text-caption text-white mt-1"><span class="live-dot" />Last 5 minutes</div>
         </v-col>
         <v-col cols="6">
           <apexchart type="area" height="90" :options="chartOptions" :series="series" />

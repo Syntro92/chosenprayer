@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { recentTransactions, statusStyle } from '../overviewData';
-// Newest first
-const rows = recentTransactions;
+import { computed } from 'vue';
+import { label, money, timeAgo } from '@/utils/format';
+import { statusStyle } from '../overviewData';
+import { useDashboard } from '../useDashboard';
+
+const { dashboard } = useDashboard();
+const rows = computed(() => dashboard.value?.recentTransactions ?? []);
+const style = (status: string) => statusStyle[status] ?? statusStyle.pending;
 </script>
 
 <template>
@@ -26,15 +31,16 @@ const rows = recentTransactions;
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(t, i) in rows" :key="i">
-              <td class="font-weight-medium">{{ t.supporter }}</td>
-              <td>{{ t.channel }}</td>
-              <td class="font-weight-medium">${{ t.amount.toFixed(2) }}</td>
+            <tr v-for="t in rows" :key="t.id" style="cursor: pointer" @click="$router.push(`/transactions/${t.id}`)">
+              <td class="font-weight-medium">{{ t.donor.name }}</td>
+              <td>{{ t.channel.name }}</td>
+              <td class="font-weight-medium">{{ money(t.amountCents, t.currency) }}</td>
               <td>
-                <span class="badge" :style="{ background: statusStyle[t.status].bg, color: statusStyle[t.status].fg }">{{ t.status }}</span>
+                <span class="badge" :style="{ background: style(t.status).bg, color: style(t.status).fg }">{{ label(t.status) }}</span>
               </td>
-              <td class="text-disabled">{{ t.time }}</td>
+              <td class="text-disabled">{{ timeAgo(t.createdAt) }}</td>
             </tr>
+          <tr v-if="!rows.length"><td colspan="5" class="text-center text-disabled py-6">No transactions yet.</td></tr>
           </tbody>
         </v-table>
       </v-card-text>

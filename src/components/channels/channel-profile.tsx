@@ -1,7 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { followAction, getFollowStateAction, unfollowAction } from "@/actions/follows";
+import {
+  createBlessingAction,
+  getDonationStatusAction,
+  getGivingConfigAction,
+  mockPayAction,
+  startDonationAction,
+} from "@/actions/giving";
+import type { GivingConfig } from "@/server/services/giving";
 import {
   formatDate,
   formatFollowers,
@@ -11,7 +21,8 @@ import {
   type Blessing,
 } from "@/lib/channels";
 import { OriginButton } from "@/components/ui/origin-button";
-import { CoverArt, CrowdIllustration, TONE_CLASS } from "./illustrations";
+import { CoverArt, CoverPhoto, CrowdIllustration, TONE_CLASS } from "./illustrations";
+import { StripePayment } from "./stripe-payment";
 
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
@@ -27,7 +38,7 @@ const PRESETS = [11, 25, 55, 111, 555] as const;
 type Frequency = "once" | "monthly";
 type Amount = number | "custom";
 
-type Support = {
+export type Support = {
   frequency: Frequency;
   amount: Amount;
   custom: string;
@@ -48,17 +59,24 @@ function Heart({ className = "size-4" }: { className?: string }) {
 
 function Avatar({
   name,
+  url,
   className = "",
 }: {
   name: string;
+  url?: string | null;
   className?: string;
 }) {
   return (
     <div
       aria-hidden
-      className={`relative z-10 flex shrink-0 items-center justify-center rounded-full border-4 border-white bg-charcoal-deep font-semibold text-bless ${className}`}
+      className={`relative z-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-charcoal-deep font-semibold text-bless ${className}`}
     >
-      {name.charAt(0)}
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- served from Supabase Storage's CDN
+        <img src={url} alt="" decoding="async" className="size-full object-cover" />
+      ) : (
+        name.charAt(0)
+      )}
     </div>
   );
 }
@@ -67,21 +85,25 @@ function Avatar({
 /* Support form (used by the sticky card and inside the modal)         */
 /* ------------------------------------------------------------------ */
 
-function SupportForm({
+export function SupportForm({
   channel,
   value,
   onChange,
   onContinue,
   compact,
+  config,
 }: {
   channel: Channel;
   value: Support;
   onChange: (next: Support) => void;
   onContinue: () => void;
   compact?: boolean;
+  /** null while loading. Controls whether giving / monthly giving are currently switched on. */
+  config: GivingConfig | null;
 }) {
   const amount = resolveAmount(value);
-  const ready = amount >= 1;
+  const paused = config?.available === false;
+  const ready = amount >= 1 && !paused && amount <= (config?.maxAmount ?? 999_999);
   const set = (patch: Partial<Support>) => onChange({ ...value, ...patch });
 
   const chip = (selected: boolean) =>
@@ -122,7 +144,9 @@ function SupportForm({
             role="radio"
             aria-checked={value.frequency === key}
             onClick={() => set({ frequency: key })}
-            className={`h-10 rounded-lg text-sm font-semibold transition ${focus} ${
+            disabled={key === "monthly" && config?.recurring === false}
+            title={key === "monthly" && config?.recurring === false ? "Monthly giving isn't available right now" : undefined}
+            className={`h-10 rounded-lg text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${focus} ${
               value.frequency === key
                 ? "bg-white text-charcoal-deep shadow-sm"
                 : "text-slate hover:text-charcoal-deep"
@@ -200,6 +224,11 @@ function SupportForm({
           : "Continue"}
       </OriginButton>
 
+      {paused && (
+        <p role="status" className="mt-4 rounded-xl bg-cream px-4 py-3 text-center text-sm text-charcoal-deep">
+          Giving is paused right now. Please check back soon.
+        </p>
+      )}
       <p className="mt-4 text-center text-sm text-slate">
         Your contribution is voluntary.
         <br />
@@ -213,26 +242,51 @@ function SupportForm({
 /* Support modal: choose → confirm → success                           */
 /* ------------------------------------------------------------------ */
 
-type Step = "choose" | "confirm" | "success";
+type Step = "choose" | "confirm" | "pay" | "success";
 
-function SupportModal({
+const POLL_ATTEMPTS = 12;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function SupportModal({
   channel,
   value,
   onChange,
   onClose,
   onBlessing,
+  blessingsEnabled = true,
+  config,
+  signedIn,
 }: {
   channel: Channel;
   value: Support;
   onChange: (next: Support) => void;
   onClose: () => void;
-  onBlessing: (message: string) => void;
+  onBlessing: (blessing: Blessing) => void;
+  /** False when the channel has blessings switched off: the thank-you screen skips the message prompt. */
+  blessingsEnabled?: boolean;
+  config: GivingConfig | null;
+  signedIn: boolean;
 }) {
   const [step, setStep] = useState<Step>("choose");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [email, setEmail] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [donation, setDonation] = useState<{ id: string; token: string } | null>(null);
+  // Stripe: the card form for a donation that is waiting for payment.
+  const [card, setCard] = useState<{ clientSecret: string; id: string; token: string } | null>(null);
+  const [cardPaid, setCardPaid] = useState(false);
+  // One key per attempt: retrying the SAME attempt can never charge twice.
+  const attemptKey = useRef("");
+  // Blessing form
   const [writing, setWriting] = useState(false);
   const [message, setMessage] = useState("");
+  const [shareName, setShareName] = useState(true);
+  const [showAmount, setShowAmount] = useState(false);
   const [sent, setSent] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [blessingBusy, setBlessingBusy] = useState(false);
+  const [blessingError, setBlessingError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const amount = resolveAmount(value);
 
@@ -250,14 +304,132 @@ function SupportModal({
     };
   }, [onClose]);
 
-  // Placeholder for the real payment call.
-  const pay = () => {
-    setBusy(true);
-    window.setTimeout(() => {
-      setBusy(false);
-      setStep("success");
-    }, 900);
+  const goConfirm = () => {
+    attemptKey.current = crypto.randomUUID();
+    setError("");
+    setEmailError("");
+    setStep("confirm");
   };
+
+  /** Polls until the provider has confirmed (or refused) the payment. */
+  async function waitForPayment(id: string, token: string): Promise<"succeeded" | "failed" | "pending"> {
+    for (let i = 0; i < POLL_ATTEMPTS; i++) {
+      const r = await getDonationStatusAction({ donationId: id, token });
+      if (r.ok && (r.data.status === "succeeded" || r.data.status === "failed")) return r.data.status;
+      await sleep(1000);
+    }
+    return "pending";
+  }
+
+  async function pay() {
+    if (busy) return;
+    if (!signedIn && !email.trim()) {
+      setEmailError("Enter your email for the receipt");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setEmailError("");
+    try {
+      const started = await startDonationAction({
+        channelHandle: channel.handle,
+        amount,
+        frequency: value.frequency,
+        donorEmail: signedIn ? undefined : email.trim(),
+        donorName: signedIn ? undefined : guestName.trim() || undefined,
+        idempotencyKey: attemptKey.current,
+      });
+      if (!started.ok) {
+        setEmailError(started.error.fields?.donorEmail ?? "");
+        setError(started.error.message);
+        return;
+      }
+      const d = started.data;
+      if (d.status !== "succeeded") {
+        // Test mode: play the part of the payment provider. A real provider confirms on its own
+        // (card form + webhook) and we simply wait for the result below.
+        if (d.provider === "stripe") {
+          if (!d.clientSecret || !config?.publishableKey) {
+            setError("Payments aren't available right now. You haven't been charged. Please try again later.");
+            return;
+          }
+          setCard({ clientSecret: d.clientSecret, id: d.donationId, token: d.token });
+          setCardPaid(false);
+          setStep("pay");
+          return;
+        }
+        if (d.provider === "mock") {
+          const m = await mockPayAction({ donationId: d.donationId, token: d.token, outcome: "succeeded" });
+          if (!m.ok) {
+            setError(m.error.message);
+            return;
+          }
+        }
+        const result = await waitForPayment(d.donationId, d.token);
+        if (result !== "succeeded") {
+          if (result === "failed") attemptKey.current = crypto.randomUUID(); // a failed payment can't be reused
+          setError(
+            result === "failed"
+              ? "Your payment didn't go through. You haven't been charged. Please try again."
+              : "We're still waiting for your payment to confirm. Please try again in a moment.",
+          );
+          return;
+        }
+      }
+      setDonation({ id: d.donationId, token: d.token });
+      setStep("success");
+    } catch {
+      setError("Something went wrong. You haven't been charged. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Stripe took the card; wait for its webhook to confirm, then show the thank-you. */
+  async function afterCard() {
+    if (!card) return;
+    setBusy(true);
+    setError("");
+    setCardPaid(true);
+    try {
+      const result = await waitForPayment(card.id, card.token);
+      if (result === "succeeded") {
+        setDonation({ id: card.id, token: card.token });
+        setStep("success");
+      } else {
+        setError(
+          result === "failed"
+            ? "Your payment didn't go through. You haven't been charged."
+            : "Your payment was received and is being confirmed. This can take a moment.",
+        );
+      }
+    } catch {
+      setError("We couldn't confirm your payment yet. It may still go through. Please check again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendBlessing(e: React.FormEvent) {
+    e.preventDefault();
+    if (!donation || !message.trim() || blessingBusy) return;
+    setBlessingBusy(true);
+    setBlessingError("");
+    const r = await createBlessingAction({
+      donationId: donation.id,
+      token: donation.token,
+      message: message.trim(),
+      anonymous: !shareName,
+      showAmount,
+      displayName: signedIn ? undefined : guestName.trim() || undefined,
+    });
+    setBlessingBusy(false);
+    if (!r.ok) return setBlessingError(r.error.message);
+    onBlessing(r.data);
+    setSent(true);
+  }
+
+  const canShowName = signedIn || guestName.trim() !== "";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-6">
@@ -293,13 +465,7 @@ function SupportModal({
             <p className="mb-5 mt-2 text-sm leading-relaxed text-slate">
               Choose what feels right. Every amount is appreciated.
             </p>
-            <SupportForm
-              channel={channel}
-              value={value}
-              onChange={onChange}
-              onContinue={() => setStep("confirm")}
-              compact
-            />
+            <SupportForm channel={channel} value={value} onChange={onChange} onContinue={goConfirm} compact config={config} />
           </>
         )}
 
@@ -320,25 +486,117 @@ function SupportModal({
                 </div>
               ))}
             </dl>
-            {/* Payment provider fields mount here. */}
+
+            {!signedIn && (
+              <div className="mt-5 space-y-3">
+                <div>
+                  <label htmlFor="donor-email" className="text-sm font-semibold text-charcoal-deep">
+                    Email for your receipt
+                  </label>
+                  <input
+                    id="donor-email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError("");
+                    }}
+                    aria-invalid={emailError ? true : undefined}
+                    placeholder="you@example.com"
+                    className={`mt-2 h-11 w-full rounded-xl border px-3 text-sm text-charcoal-deep placeholder:text-slate/70 ${focus} ${emailError ? "border-red-600" : "border-line"}`}
+                  />
+                  {emailError && <p role="alert" className="mt-1 text-sm text-red-700">{emailError}</p>}
+                </div>
+                <div>
+                  <label htmlFor="donor-name" className="text-sm font-semibold text-charcoal-deep">
+                    Your name <span className="font-normal text-slate">(optional)</span>
+                  </label>
+                  <input
+                    id="donor-name"
+                    type="text"
+                    autoComplete="name"
+                    maxLength={80}
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    className={`mt-2 h-11 w-full rounded-xl border border-line px-3 text-sm text-charcoal-deep ${focus}`}
+                  />
+                </div>
+              </div>
+            )}
+
+            {config?.testMode && (
+              <p className="mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
+                <span className="font-semibold">Test mode.</span> This is a practice payment. No real money moves.
+                {config.provider === "stripe" && " Use the test card 4242 4242 4242 4242, any future date and any CVC."}
+              </p>
+            )}
             <p className="mt-4 text-sm text-slate">
               Your contribution is voluntary. Secure payment.
             </p>
+            {error && (
+              <p role="alert" className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+                {error}
+              </p>
+            )}
             <OriginButton
               type="button"
               onClick={pay}
               disabled={busy}
               className="mt-5 w-full"
             >
-              {busy ? "Sending…" : `Send ${money(amount)}`}
+              {busy ? "Sending…" : `Send ${money(amount)}${value.frequency === "monthly" ? "/mo" : ""}`}
             </OriginButton>
             <button
               type="button"
               onClick={() => setStep("choose")}
+              disabled={busy}
               className={`mt-2 h-10 w-full rounded-xl text-sm font-medium text-slate transition hover:text-charcoal-deep ${focus}`}
             >
               Back
             </button>
+          </>
+        )}
+
+        {step === "pay" && card && config?.publishableKey && (
+          <>
+            <h2 className="pr-8 text-2xl font-semibold tracking-tight text-charcoal-deep">Payment details</h2>
+            <p className="mt-2 text-sm text-slate">
+              {money(amount)}
+              {value.frequency === "monthly" ? " every month" : ""} to {channel.name}
+            </p>
+            {config.testMode && (
+              <p className="mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
+                <span className="font-semibold">Test mode.</span> No real money moves. Use the test card 4242 4242 4242 4242, any future date and any CVC.
+              </p>
+            )}
+            {cardPaid ? (
+              <div className="mt-6">
+                <p role="status" className="rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
+                  Payment sent. Confirming with the bank…
+                </p>
+                {error && (
+                  <p role="alert" className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {error}
+                  </p>
+                )}
+                <OriginButton type="button" onClick={afterCard} disabled={busy} className="mt-5 w-full">
+                  {busy ? "Checking…" : "Check again"}
+                </OriginButton>
+              </div>
+            ) : (
+              <StripePayment
+                publishableKey={config.publishableKey}
+                clientSecret={card.clientSecret}
+                label={`Pay ${money(amount)}${value.frequency === "monthly" ? "/mo" : ""}`}
+                onSubmitted={afterCard}
+                onBack={() => {
+                  setCard(null);
+                  setStep("choose");
+                }}
+                busy={busy}
+              />
+            )}
           </>
         )}
 
@@ -353,21 +611,14 @@ function SupportModal({
             <p className="mt-3 text-slate">
               Thank you for supporting {channel.name}.
             </p>
+            <p className="mt-1 text-sm text-slate">A receipt is on its way to your email.</p>
 
-            {sent ? (
+            {!blessingsEnabled ? null : sent ? (
               <p className="mt-6 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
-                Your message has been shared with the community.
+                Your message has been shared on this channel.
               </p>
             ) : writing ? (
-              <form
-                className="mt-6 text-left"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!message.trim()) return;
-                  onBlessing(message.trim());
-                  setSent(true);
-                }}
-              >
+              <form className="mt-6 text-left" onSubmit={sendBlessing}>
                 <label htmlFor="blessing" className="text-sm font-semibold text-charcoal-deep">
                   Your message
                 </label>
@@ -381,8 +632,21 @@ function SupportModal({
                   placeholder="Say something kind…"
                   className={`mt-2 w-full resize-none rounded-xl border border-line p-3 text-sm text-charcoal-deep placeholder:text-slate/70 ${focus}`}
                 />
-                <OriginButton type="submit" className="mt-3 w-full">
-                  Share Blessing
+                <div className="mt-3 space-y-2 text-sm text-charcoal-deep">
+                  {canShowName && (
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" checked={shareName} onChange={(e) => setShareName(e.target.checked)} className="size-4" />
+                      Show my name
+                    </label>
+                  )}
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={showAmount} onChange={(e) => setShowAmount(e.target.checked)} className="size-4" />
+                    Show how much I gave
+                  </label>
+                </div>
+                {blessingError && <p role="alert" className="mt-3 text-sm text-red-700">{blessingError}</p>}
+                <OriginButton type="submit" disabled={blessingBusy} className="mt-3 w-full">
+                  {blessingBusy ? "Sharing…" : "Share Blessing"}
                 </OriginButton>
               </form>
             ) : (
@@ -423,11 +687,12 @@ const SECTIONS = [
   { id: "blessings", label: "Blessings" },
 ] as const;
 
-function TabBar() {
+function TabBar({ showBlessings }: { showBlessings: boolean }) {
+  const sections = useMemo(() => (showBlessings ? SECTIONS : SECTIONS.filter((s) => s.id !== "blessings")), [showBlessings]);
   const [active, setActive] = useState<string>("about");
 
   useEffect(() => {
-    const els = SECTIONS.map((s) => document.getElementById(s.id)).filter(
+    const els = sections.map((s) => document.getElementById(s.id)).filter(
       (e): e is HTMLElement => !!e,
     );
     const io = new IntersectionObserver(
@@ -439,7 +704,7 @@ function TabBar() {
     );
     els.forEach((e) => io.observe(e));
     return () => io.disconnect();
-  }, []);
+  }, [sections]);
 
   return (
     <nav
@@ -447,7 +712,7 @@ function TabBar() {
       className="sticky top-0 z-30 -mx-4 mt-10 border-b border-line bg-ivory/90 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0"
     >
       <ul className="flex gap-8">
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <li key={s.id}>
             <a
               href={`#${s.id}`}
@@ -558,9 +823,62 @@ export function ChannelProfile({
     custom: "",
   });
   const [open, setOpen] = useState(false);
-  const [following, setFollowing] = useState(false);
+  const router = useRouter();
+  // Follow state: the page itself is cached for everyone, so "do I follow this?" is
+  // fetched per viewer after load. Until it arrives the button is a disabled "Follow".
+  const [follow, setFollow] = useState({ ready: false, signedIn: false, following: false });
+  const [followers, setFollowers] = useState(channel.followers);
+  const [followError, setFollowError] = useState("");
+  const [, startFollow] = useTransition();
+  const following = follow.following;
+
+  useEffect(() => {
+    let alive = true;
+    getFollowStateAction(channel.handle).then((r) => {
+      if (!alive) return;
+      setFollow(r.ok ? { ready: true, ...r.data } : { ready: true, signedIn: false, following: false });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [channel.handle]);
+
+  function toggleFollow() {
+    if (!follow.signedIn) {
+      router.push(`/signin?next=${encodeURIComponent(`/channels/${channel.handle}`)}`);
+      return;
+    }
+    const next = !follow.following;
+    setFollowError("");
+    setFollow((f) => ({ ...f, following: next }));
+    setFollowers((n) => Math.max(0, n + (next ? 1 : -1)));
+    startFollow(async () => {
+      const r = await (next ? followAction : unfollowAction)(channel.handle);
+      if (r.ok) {
+        setFollowers(r.data.followerCount);
+      } else {
+        setFollow((f) => ({ ...f, following: !next }));
+        setFollowers((n) => Math.max(0, n + (next ? -1 : 1)));
+        setFollowError(r.error.message);
+      }
+    });
+  }
   const [shared, setShared] = useState(false);
   const [blessings, setBlessings] = useState<Blessing[]>(data.blessings);
+  const [blessingsAdded, setBlessingsAdded] = useState(0);
+  const [config, setConfig] = useState<GivingConfig | null>(null);
+  const blessingCount = data.blessingsCount + blessingsAdded;
+
+  // Is giving switched on, is monthly allowed, is this test mode? (Not cached: it can change at any time.)
+  useEffect(() => {
+    let alive = true;
+    getGivingConfigAction().then((r) => {
+      if (alive && r.ok) setConfig(r.data);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Mobile: the sticky button only appears once the inline support card
   // has been scrolled past (it's above the viewport).
@@ -606,16 +924,10 @@ export function ChannelProfile({
     }
   };
 
-  const addBlessing = (message: string) =>
-    setBlessings((prev) => [
-      {
-        id: `new-${prev.length}`,
-        name: "Anonymous",
-        message,
-        date: new Date().toISOString().slice(0, 10),
-      },
-      ...prev,
-    ]);
+  const addBlessing = (blessing: Blessing) => {
+    setBlessings((prev) => [blessing, ...prev]);
+    setBlessingsAdded((n) => n + 1);
+  };
 
   return (
     <div>
@@ -624,7 +936,7 @@ export function ChannelProfile({
         <div
           className={`relative h-44 overflow-hidden rounded-[22px] bg-gradient-to-br sm:h-60 lg:h-72 lg:rounded-[28px] ${TONE_CLASS[channel.cover.tone]}`}
         >
-          <CoverArt scene={channel.cover.scene} />
+          {channel.coverUrl ? <CoverPhoto url={channel.coverUrl} /> : <CoverArt scene={channel.cover.scene} />}
           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white/30 to-transparent" />
         </div>
       </div>
@@ -636,6 +948,7 @@ export function ChannelProfile({
           <header className="px-1 sm:px-4">
             <Avatar
               name={channel.name}
+              url={channel.avatarUrl}
               className="-mt-12 size-24 text-4xl sm:-mt-14 sm:size-28 sm:text-5xl"
             />
             <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -661,9 +974,9 @@ export function ChannelProfile({
 
             <dl className="mt-7 flex gap-8 sm:gap-12">
               {[
-                [formatFollowers(channel.followers), "Followers"],
+                [formatFollowers(followers), "Followers"],
                 [formatSupporters(channel.supporters), "Supporters"],
-                [formatFollowers(data.blessingsCount), "Blessings"],
+                ...(data.showBlessings ? [[formatFollowers(blessingCount), "Blessings"]] : []),
               ].map(([n, label]) => (
                 <div key={label}>
                   <dd className="text-2xl font-semibold tracking-tight text-charcoal-deep">
@@ -686,8 +999,9 @@ export function ChannelProfile({
               <button
                 type="button"
                 aria-pressed={following}
-                onClick={() => setFollowing((f) => !f)}
-                className={`inline-flex h-12 items-center justify-center rounded-xl border px-5 text-sm font-semibold transition active:scale-[0.98] ${focus} ${
+                disabled={!follow.ready}
+                onClick={toggleFollow}
+                className={`inline-flex h-12 items-center justify-center rounded-xl border px-5 text-sm font-semibold transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 ${focus} ${
                   following
                     ? "border-charcoal-deep/20 bg-mist text-charcoal-deep"
                     : "border-charcoal-deep bg-charcoal-deep text-white hover:bg-charcoal-deep/90"
@@ -703,6 +1017,11 @@ export function ChannelProfile({
                 {shared ? "Link copied" : "Share"}
               </button>
             </div>
+            {followError && (
+              <p role="alert" className="mt-3 text-sm text-red-700">
+                {followError}
+              </p>
+            )}
           </header>
 
           {/* Inline support card (mobile), above About */}
@@ -715,10 +1034,11 @@ export function ChannelProfile({
               value={support}
               onChange={setSupport}
               onContinue={openSupport}
+              config={config}
             />
           </div>
 
-          <TabBar />
+          <TabBar showBlessings={data.showBlessings} />
 
           {/* About */}
           <section id="about" className="scroll-mt-16 pt-14">
@@ -784,32 +1104,49 @@ export function ChannelProfile({
 
           {/* Community */}
           <section id="blessings" className="scroll-mt-16 pt-20">
+            {data.showBlessings && (
+              <>
             <span className={eyebrow}>From the community</span>
             <h2 className={`${h2} max-w-xl`}>
               Blessings from people who support this work.
             </h2>
-            <div className="mt-8 grid gap-5 sm:grid-cols-2">
-              {blessings.map((b) => (
-                <BlessingCard key={b.id} b={b} />
-              ))}
-            </div>
-            <div className="mt-8">
-              <Link href={`/channels/${channel.handle}/blessings`} className={ghostBtn}>
-                View All Blessings
-              </Link>
-            </div>
+            {blessings.length > 0 ? (
+              <>
+                <div className="mt-8 grid gap-5 sm:grid-cols-2">
+                  {blessings.map((b) => (
+                    <BlessingCard key={b.id} b={b} />
+                  ))}
+                </div>
+                <div className="mt-8">
+                  <Link href={`/channels/${channel.handle}/blessings`} className={ghostBtn}>
+                    View All Blessings
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <p className="mt-8 rounded-[18px] border border-dashed border-line bg-white px-6 py-10 text-center text-slate">
+                No blessings yet. Supporters can leave a kind message after they give.
+              </p>
+            )}
+              </>
+            )}
 
             <div className="mt-12 overflow-hidden rounded-[22px] border border-line bg-white">
               <div className="px-8 pt-10 text-center sm:px-12">
                 <p className="text-2xl font-semibold tracking-tight text-charcoal-deep sm:text-3xl">
-                  {formatSupporters(channel.supporters)} people have supported
-                  this channel.
+                  {channel.supporters > 0
+                    ? `${formatSupporters(channel.supporters)} ${channel.supporters === 1 ? "person has" : "people have"} supported this channel.`
+                    : "Be one of the first to support this channel."}
                 </p>
-                <p className="mt-2 text-slate">
-                  Together, they&apos;ve shared{" "}
-                  {formatSupporters(Math.floor(data.blessingsCount / 100) * 100)}+
-                  blessings.
-                </p>
+                {data.showBlessings && blessingCount > 0 && (
+                  <p className="mt-2 text-slate">
+                    Together, they&apos;ve shared{" "}
+                    {blessingCount >= 100
+                      ? `${formatSupporters(Math.floor(blessingCount / 100) * 100)}+`
+                      : formatSupporters(blessingCount)}{" "}
+                    {blessingCount === 1 ? "blessing" : "blessings"}.
+                  </p>
+                )}
               </div>
               <div className="relative mt-4 h-24 overflow-hidden">
                 <CrowdIllustration className="absolute -bottom-4 left-1/2 w-[520px] max-w-none -translate-x-1/2" />
@@ -847,6 +1184,7 @@ export function ChannelProfile({
                 value={support}
                 onChange={setSupport}
                 onContinue={openSupport}
+              config={config}
               />
             </div>
           </div>
@@ -912,6 +1250,9 @@ export function ChannelProfile({
           onChange={setSupport}
           onClose={closeSupport}
           onBlessing={addBlessing}
+          blessingsEnabled={data.showBlessings}
+          config={config}
+          signedIn={follow.signedIn}
         />
       )}
     </div>

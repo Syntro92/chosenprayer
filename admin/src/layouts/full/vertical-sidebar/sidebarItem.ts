@@ -15,11 +15,9 @@ import {
   BroadcastIcon,
   SettingsIcon,
   HeartbeatIcon,
-  ToggleLeftIcon,
   EyeIcon,
   UserIcon,
-  PlusIcon,
-  ListDetailsIcon
+  HistoryIcon
 } from 'vue-tabler-icons';
 
 export interface menu {
@@ -51,16 +49,6 @@ const sidebarItem: menu[] = [
     to: '/channels'
   },
   {
-    title: 'Channel Details',
-    icon: ListDetailsIcon,
-    to: '/channels/1'
-  },
-  {
-    title: 'Add Channel',
-    icon: PlusIcon,
-    to: '/channels/add'
-  },
-  {
     title: 'Transactions',
     icon: ReceiptIcon,
     to: '/transactions'
@@ -69,11 +57,6 @@ const sidebarItem: menu[] = [
     title: 'Users',
     icon: UsersIcon,
     to: '/users'
-  },
-  {
-    title: 'User Details',
-    icon: UserIcon,
-    to: '/users/1'
   },
   {
     title: 'Analytics',
@@ -91,9 +74,9 @@ const sidebarItem: menu[] = [
     to: '/site-health'
   },
   {
-    title: 'Feature Management',
-    icon: ToggleLeftIcon,
-    to: '/features'
+    title: 'Audit Log',
+    icon: HistoryIcon,
+    to: '/audit'
   },
   {
     title: 'Settings',

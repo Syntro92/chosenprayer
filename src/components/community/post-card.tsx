@@ -1,13 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  Ban,
   ClipboardCheck,
   Flag,
   Heart,
   MessageCircle,
   Pencil,
+  Pin,
+  PinOff,
   Share2,
   ShieldX,
   Trash2,
@@ -18,7 +22,7 @@ import type { Post } from "@/lib/community/types";
 import { Attachments } from "./attachments";
 import { Comments } from "./comments";
 import { useCommunity } from "./community-provider";
-import { ConfirmDialog, InfoDialog, ReportDialog } from "./dialogs";
+import { ConfirmDialog, ReasonDialog, ReportDialog } from "./dialogs";
 import { ActionMenu, Avatar, CharCounter, focus, primaryBtn, secondaryBtn, type MenuItem } from "./ui";
 
 export function PostCard({ post, detail = false }: { post: Post; detail?: boolean }) {
@@ -26,13 +30,15 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
     getMember,
     user,
     isModerator,
+    isAdmin,
     ageOf,
-    comments,
     likedPosts,
     toggleLike,
     requireAuth,
     editPost,
     removePost,
+    pinPost,
+    blockMember,
     reportPost,
     toast,
   } = useCommunity();
@@ -42,7 +48,8 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(post.text);
   const [saving, setSaving] = useState(false);
-  const [dialog, setDialog] = useState<null | "delete" | "remove" | "report" | "review">(null);
+  const router = useRouter();
+  const [dialog, setDialog] = useState<null | "delete" | "remove" | "report" | "block">(null);
   const [busy, setBusy] = useState(false);
 
   const author = getMember(post.authorId);
@@ -50,7 +57,7 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
 
   const mine = user?.id === post.authorId;
   const liked = likedPosts.has(post.id);
-  const commentCount = comments.filter((c) => c.postId === post.id).length;
+  const commentCount = post.commentCount;
   const long = post.text.length > LIMITS.collapsePostAt;
   const postUrl = `/community/posts/${post.id}`;
 
@@ -64,7 +71,6 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
     }
   };
 
-  // Anyone can read comments; writing one asks visitors to sign in (see CommentForm).
   const openComments = () => setCommentsOpen((o) => !o);
 
   const items: MenuItem[] = [];
@@ -76,7 +82,7 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
       label: "Report post",
       icon: <Flag size={15} />,
       onSelect: () => {
-        if (requireAuth(() => setDialog("report"))) setDialog("report");
+        if (requireAuth()) setDialog("report");
       },
     });
   }
@@ -84,14 +90,29 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
     items.push({ label: "Delete post", icon: <Trash2 size={15} />, onSelect: () => setDialog("delete"), danger: true });
   }
   if (isModerator && !mine) {
-    items.push({ label: "Review report", icon: <ClipboardCheck size={15} />, onSelect: () => setDialog("review") });
-    items.push({ label: "Hide / remove post", icon: <ShieldX size={15} />, onSelect: () => setDialog("remove"), danger: true });
+    items.push({ label: "Report queue", icon: <ClipboardCheck size={15} />, onSelect: () => router.push("/community/moderation") });
+    items.push({ label: "Remove post (moderator)", icon: <ShieldX size={15} />, onSelect: () => setDialog("remove"), danger: true });
+  }
+  if (isAdmin) {
+    items.push(
+      post.pinned
+        ? { label: "Unpin post", icon: <PinOff size={15} />, onSelect: () => void pinPost(post.id, false) }
+        : { label: "Pin to top", icon: <Pin size={15} />, onSelect: () => void pinPost(post.id, true) },
+    );
+  }
+  if (isAdmin && !mine) {
+    items.push({ label: `Block ${author.name}`, icon: <Ban size={15} />, onSelect: () => setDialog("block"), danger: true });
   }
 
   const action = `inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium text-slate transition-colors hover:bg-charcoal-deep/5 hover:text-charcoal-deep ${focus}`;
 
   return (
     <article className="rounded-[22px] border border-line bg-white p-4 sm:p-5" aria-label={`Post by ${author.name}`}>
+      {post.pinned && (
+        <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate">
+          <Pin size={13} aria-hidden /> Pinned
+        </p>
+      )}
       <header className="flex items-start gap-3">
         <Link href={`/community/members/${author.username}`} aria-label={`${author.name}'s profile`} className={`rounded-full ${focus}`}>
           <Avatar member={author} />
@@ -195,33 +216,40 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
       {commentsOpen && <Comments postId={post.id} autoFocus={!detail} />}
 
       <ConfirmDialog
-        open={dialog === "delete" || dialog === "remove"}
-        title={dialog === "remove" ? "Hide / remove this post?" : "Delete this post?"}
-        text={
-          dialog === "remove"
-            ? "This removes the post and its comments from the community. A real moderation system would also record why."
-            : "This removes your post and its comments. This can't be undone."
-        }
-        confirmLabel={dialog === "remove" ? "Remove post" : "Delete post"}
+        open={dialog === "delete"}
+        title="Delete this post?"
+        text="This removes your post and its comments. This can't be undone."
+        confirmLabel="Delete post"
         busy={busy}
         onClose={() => setDialog(null)}
         onConfirm={async () => {
           setBusy(true);
-          await removePost(post.id, dialog === "remove");
+          await removePost(post.id);
           setBusy(false);
           setDialog(null);
         }}
+      />
+      <ReasonDialog
+        open={dialog === "remove"}
+        title="Remove this post?"
+        text="The post and its comments disappear for everyone. The author is told the reason you give, and the action is logged."
+        confirmLabel="Remove post"
+        onClose={() => setDialog(null)}
+        onSubmit={(reason) => removePost(post.id, true, reason)}
+      />
+      <ReasonDialog
+        open={dialog === "block"}
+        title={`Block ${author.name}?`}
+        text="They are signed out and can't sign in, post or comment until an admin lifts the block. Their existing posts stay visible; remove those separately. The reason is kept in the audit log."
+        confirmLabel="Block member"
+        placeholder="Reason (kept in the audit log)"
+        onClose={() => setDialog(null)}
+        onSubmit={(reason) => blockMember(post.authorId, reason)}
       />
       <ReportDialog
         open={dialog === "report"}
         onClose={() => setDialog(null)}
         onSubmit={(reason, note) => reportPost(post.id, reason, note)}
-      />
-      <InfoDialog
-        open={dialog === "review"}
-        title="Review report"
-        text="Report review isn't built yet. This is the integration point where a moderation queue will open. Demo mode: there are no real reports."
-        onClose={() => setDialog(null)}
       />
     </article>
   );

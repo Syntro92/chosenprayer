@@ -1,0 +1,15 @@
+$ORIGIN chosenprayer.com.
+$TTL 3600
+
+; Mailtrap domain verification
+mt51                    IN CNAME smtp.mailtrap.live.
+
+; Mailtrap DKIM
+rwmt1._domainkey        IN CNAME rwmt1.dkim.smtp.mailtrap.live.
+rwmt2._domainkey        IN CNAME rwmt2.dkim.smtp.mailtrap.live.
+
+; DMARC
+_dmarc                  IN TXT   "v=DMARC1; p=none; rua=mailto:dmarc@reports.mailtrap.io; ruf=mailto:dmarc@reports.mailtrap.io; rf=afrf; pct=100"
+
+; Mailtrap click tracking
+mt-link                 IN CNAME t.mailtrap.live.

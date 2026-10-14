@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { signOutAction } from "@/actions/auth";
 import { LANGUAGES } from "@/lib/languages";
+import { setLanguage, useLanguage } from "@/lib/language-store";
+
+/** `undefined` = still loading (show no auth controls), `null` = signed out. */
+export type HeaderSession = { displayName: string; username: string } | null | undefined;
 
 const NAV = [
   { label: "Home", href: "/" },
@@ -17,7 +22,7 @@ const focus =
 
 function LanguageSelector() {
   const [open, setOpen] = useState(false);
-  const [lang, setLang] = useState(LANGUAGES[0]);
+  const lang = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,7 +42,7 @@ function LanguageSelector() {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} translate="no" className="relative">
       <button
         type="button"
         aria-haspopup="listbox"
@@ -79,7 +84,7 @@ function LanguageSelector() {
               type="button"
               tabIndex={open ? 0 : -1}
               onClick={() => {
-                setLang(l);
+                setLanguage(l);
                 setOpen(false);
               }}
               className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-neutral-800 transition-colors hover:bg-neutral-900/5 ${focus} ${
@@ -98,7 +103,131 @@ function LanguageSelector() {
   );
 }
 
-export function Header() {
+/** Signed-in profile button (replaces "Sign In") with a dropdown: account page + sign out. */
+function AccountMenu({ session }: { session: NonNullable<HeaderSession> }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const item = `flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-neutral-800 transition-colors hover:bg-neutral-900/5 ${focus}`;
+
+  return (
+    <div ref={ref} className="relative hidden md:block">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Account menu for ${session.displayName}`}
+        translate="no"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex h-10 items-center gap-2 rounded-xl border border-neutral-900/10 bg-white/50 pl-1.5 pr-3 text-sm font-medium text-neutral-800 backdrop-blur transition-colors hover:bg-white/80 ${focus}`}
+      >
+        <span aria-hidden className="flex size-7 items-center justify-center rounded-full bg-amber-400 text-xs font-semibold text-neutral-900">
+          {session.displayName.charAt(0).toUpperCase()}
+        </span>
+        <span translate="no" className="max-w-[8rem] truncate">{session.displayName}</span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
+          aria-hidden
+          className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <div
+        role="menu"
+        aria-label="Account"
+        className={`absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-xl border border-neutral-900/10 bg-white p-1 shadow-lg transition duration-150 ${
+          open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"
+        }`}
+      >
+        <div className="px-3 py-2">
+          <p translate="no" className="truncate text-sm font-semibold text-neutral-900">{session.displayName}</p>
+          <p translate="no" className="truncate text-xs text-neutral-500">@{session.username}</p>
+        </div>
+        <div className="my-1 h-px bg-neutral-900/10" role="separator" />
+        <Link href="/account" role="menuitem" tabIndex={open ? 0 : -1} onClick={() => setOpen(false)} className={item}>
+          Your profile
+        </Link>
+        <form action={signOutAction}>
+          <button type="submit" role="menuitem" tabIndex={open ? 0 : -1} className={item}>
+            Sign out
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function activeHref(pathname: string) {
+  return NAV.find((n) => (n.href === "/" ? pathname === "/" : pathname.startsWith(n.href)))?.href ?? "";
+}
+
+const linkClass = (isActive: boolean) =>
+  `rounded-xl px-3 py-2 text-sm font-medium transition-colors ${focus} ${
+    isActive
+      ? "bg-neutral-900/5 text-neutral-900"
+      : "text-neutral-600 hover:bg-neutral-900/5 hover:text-neutral-900"
+  }`;
+
+type NavLinksProps = { mobile?: boolean; menuOpen?: boolean; onNavigate?: () => void };
+
+/** The nav links, with `pathname` supplied by the caller (empty = no highlighted link). */
+function NavLinks({ pathname, mobile, menuOpen, onNavigate }: NavLinksProps & { pathname: string }) {
+  const active = activeHref(pathname);
+  return (
+    <>
+      {NAV.map((n) => (
+        <Link
+          key={n.href}
+          href={n.href}
+          aria-current={active === n.href ? "page" : undefined}
+          tabIndex={mobile ? (menuOpen ? 0 : -1) : undefined}
+          onClick={onNavigate}
+          className={mobile ? `${linkClass(active === n.href)} py-3 text-base` : linkClass(active === n.href)}
+        >
+          {n.label}
+        </Link>
+      ))}
+    </>
+  );
+}
+
+/**
+ * usePathname() is request-time data on dynamic routes (like /channels/[handle]), so it must
+ * sit inside Suspense. The fallback renders the same links without the highlight.
+ */
+function ActiveNavLinks(props: NavLinksProps) {
+  return <NavLinks pathname={usePathname()} {...props} />;
+}
+
+function MainNav(props: NavLinksProps) {
+  return (
+    <Suspense fallback={<NavLinks pathname="" {...props} />}>
+      <ActiveNavLinks {...props} />
+    </Suspense>
+  );
+}
+
+export function Header({ session }: { session?: HeaderSession }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -108,19 +237,6 @@ export function Header() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  const pathname = usePathname();
-  const active =
-    NAV.find((n) =>
-      n.href === "/" ? pathname === "/" : pathname.startsWith(n.href),
-    )?.href ?? "";
-
-  const linkClass = (href: string) =>
-    `rounded-xl px-3 py-2 text-sm font-medium transition-colors ${focus} ${
-      active === href
-        ? "bg-neutral-900/5 text-neutral-900"
-        : "text-neutral-600 hover:bg-neutral-900/5 hover:text-neutral-900"
-    }`;
 
   return (
     <header
@@ -134,32 +250,27 @@ export function Header() {
         <Link
           href="/"
           aria-label="Chosen Prayer home"
+          translate="no"
           className={`rounded-xl text-lg font-semibold tracking-tight text-neutral-900 ${focus}`}
         >
           Chosen<span className="text-amber-500"> Prayer</span>
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              aria-current={active === n.href ? "page" : undefined}
-              className={linkClass(n.href)}
-            >
-              {n.label}
-            </Link>
-          ))}
+          <MainNav />
         </nav>
 
         <div className="flex items-center gap-2 lg:gap-3">
           <LanguageSelector />
-          <Link
-            href="/signin"
-            className={`hidden rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-900/5 hover:text-neutral-900 md:block ${focus}`}
-          >
-            Sign In
-          </Link>
+          {session === null && (
+            <Link
+              href="/signin"
+              className={`hidden rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-900/5 hover:text-neutral-900 md:block ${focus}`}
+            >
+              Sign In
+            </Link>
+          )}
+          {session && <AccountMenu session={session} />}
           <Link
             href="/channels"
             className={`hidden h-10 items-center rounded-xl bg-amber-400 px-4 text-sm font-semibold text-neutral-900 shadow-sm transition hover:bg-amber-300 active:scale-[0.98] md:inline-flex ${focus}`}
@@ -195,27 +306,38 @@ export function Header() {
         aria-hidden={!menuOpen}
       >
         <nav aria-label="Mobile" className="flex flex-col gap-1">
-          {NAV.map((n) => (
+          <MainNav mobile menuOpen={menuOpen} onNavigate={() => setMenuOpen(false)} />
+          {session === null && (
             <Link
-              key={n.href}
-              href={n.href}
+              href="/signin"
               tabIndex={menuOpen ? 0 : -1}
-              onClick={() => {
-                setMenuOpen(false);
-              }}
-              className={`${linkClass(n.href)} py-3 text-base`}
+              onClick={() => setMenuOpen(false)}
+              className={`rounded-xl px-3 py-3 text-base font-medium text-neutral-700 transition-colors hover:bg-neutral-900/5 ${focus}`}
             >
-              {n.label}
+              Sign In
             </Link>
-          ))}
-          <Link
-            href="/signin"
-            tabIndex={menuOpen ? 0 : -1}
-            onClick={() => setMenuOpen(false)}
-            className={`rounded-xl px-3 py-3 text-base font-medium text-neutral-700 transition-colors hover:bg-neutral-900/5 ${focus}`}
-          >
-            Sign In
-          </Link>
+          )}
+          {session && (
+            <>
+              <Link
+                href="/account"
+                tabIndex={menuOpen ? 0 : -1}
+                onClick={() => setMenuOpen(false)}
+                className={`rounded-xl px-3 py-3 text-base font-medium text-neutral-700 transition-colors hover:bg-neutral-900/5 ${focus}`}
+              >
+                Account ({session.displayName})
+              </Link>
+              <form action={signOutAction}>
+                <button
+                  type="submit"
+                  tabIndex={menuOpen ? 0 : -1}
+                  className={`w-full rounded-xl px-3 py-3 text-left text-base font-medium text-neutral-700 transition-colors hover:bg-neutral-900/5 ${focus}`}
+                >
+                  Sign out
+                </button>
+              </form>
+            </>
+          )}
           <Link
             href="/channels"
             tabIndex={menuOpen ? 0 : -1}

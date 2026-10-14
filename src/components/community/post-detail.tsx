@@ -58,7 +58,7 @@ export function PostDetail({ postId }: { postId: string }) {
         ) : (
           <EmptyState
             title="This post isn't available"
-            text="It may have been removed, or it only existed in a previous demo session (demo posts aren't saved)."
+            text="It may have been removed by its author."
             action={<Link href="/community" className={primaryBtn}>Back to community</Link>}
           />
         )}

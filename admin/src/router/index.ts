@@ -15,43 +15,18 @@ export const router = createRouter({
   ]
 });
 
-interface User {
-  // Define the properties and their types for the user data here
-  // For example:
-  id: number;
-  name: string;
-}
+router.beforeEach(async (to) => {
+  const auth = useAuthStore();
+  await auth.restore();
 
-// Assuming you have a type/interface for your authentication store
-interface AuthStore {
-  user: User | null;
-  returnUrl: string | null;
-  login(username: string, password: string): Promise<void>;
-  logout(): void;
-}
-
-router.beforeEach(async (to, from, next) => {
-  // redirect to login page if not logged in and trying to access a restricted page
-  const publicPages = ['/'];
-  const auth: AuthStore = useAuthStore();
-
-  const isPublicPage = publicPages.includes(to.path);
-  const authRequired = !isPublicPage && to.matched.some((record) => record.meta.requiresAuth);
-
-  // User not logged in and trying to access a restricted page
+  const authRequired = to.matched.some((record) => record.meta.requiresAuth);
   if (authRequired && !auth.user) {
-    auth.returnUrl = to.fullPath; // Save the intended page
-    next('/login');
-  } else if (auth.user && to.path === '/login') {
-    // User logged in and trying to access the login page
-    next({
-      query: {
-        ...to.query,
-        redirect: auth.returnUrl !== '/' ? to.fullPath : undefined
-      }
-    });
-  } else {
-    // All other scenarios, either public page or authorized access
-    next();
+    auth.returnUrl = to.fullPath;
+    return '/login';
   }
+  // A temporary password must be replaced before anything else is reachable.
+  if (auth.user?.mustChangePassword && to.path !== '/change-password') return '/change-password';
+  if (to.path === '/change-password') return auth.user ? (auth.user.mustChangePassword ? true : '/dashboard/default') : '/login';
+  if (auth.user && to.path === '/login') return '/dashboard/default';
+  return true;
 });

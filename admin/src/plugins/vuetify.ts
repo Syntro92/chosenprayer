@@ -29,9 +29,12 @@ export default createVuetify({
     VCard: {
       rounded: 'md'
     },
-    VTextField: {
-      rounded: 'lg'
-    },
+    // Every form field: square corners, outlined, regular height.
+    VTextField: { variant: 'outlined', rounded: '0', density: 'comfortable' },
+    VTextarea: { variant: 'outlined', rounded: '0', density: 'comfortable' },
+    VSelect: { variant: 'outlined', rounded: '0', density: 'comfortable' },
+    VAutocomplete: { variant: 'outlined', rounded: '0', density: 'comfortable' },
+    VCombobox: { variant: 'outlined', rounded: '0', density: 'comfortable' },
     VTooltip: {
       // set v-tooltip default location to top
       location: 'top'

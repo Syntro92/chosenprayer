@@ -47,6 +47,21 @@ body {
   .v-card-item {
     overflow-wrap: anywhere;
   }
+  // ...but table cells keep their words whole: the table gets a minimum width and scrolls sideways
+  .v-table > .v-table__wrapper > table {
+    min-width: 640px;
+  }
+  .v-table th,
+  .v-table td {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+  // list/filters: pagination footer wraps instead of overflowing
+  .v-data-table-footer {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px;
+  }
   .customizer-btn {
     right: 6px;
   }

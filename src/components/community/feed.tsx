@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, Search } from "lucide-react";
 import { formatAge } from "@/lib/community/format";
-import { SAMPLE_MEMBERS } from "@/lib/community/sample-data";
 import { useCommunity } from "./community-provider";
 import { Composer } from "./composer";
 import { PostCard } from "./post-card";
@@ -23,63 +22,82 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "media", label: "Images & Files" },
 ];
 function Notifications() {
-  const { user, notifications } = useCommunity();
+  const { user, notifications, unreadNotifications, refreshNotifications, markNotificationsRead } = useCommunity();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const unread = useRef(unreadNotifications);
+  useEffect(() => {
+    unread.current = unreadNotifications;
+  }, [unreadNotifications]);
+
+  // Closing the panel is what marks things as read, so the bold "new" styling is visible while it is open.
+  const close = () => {
+    setOpen(false);
+    if (unread.current > 0) void markNotificationsRead();
+  };
+  const toggle = () => {
+    if (open) return close();
+    setOpen(true);
+    void refreshNotifications();
+  };
 
   useEffect(() => {
     if (!open) return;
     const down = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node)) close();
     };
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && close();
     document.addEventListener("mousedown", down);
     document.addEventListener("keydown", key);
     return () => {
       document.removeEventListener("mousedown", down);
       document.removeEventListener("keydown", key);
     };
+    // close() only reads refs and stable callbacks
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label="Notifications"
-        className={`flex size-11 items-center justify-center rounded-xl border border-line bg-white text-slate transition-colors hover:border-slate/50 hover:text-charcoal-deep ${focus}`}
+        aria-label={unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : "Notifications"}
+        className={`relative flex size-11 items-center justify-center rounded-xl border border-line bg-white text-slate transition-colors hover:border-slate/50 hover:text-charcoal-deep ${focus}`}
       >
         <Bell size={18} aria-hidden />
+        {unreadNotifications > 0 && (
+          <span
+            aria-hidden
+            className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-bless px-1.5 text-[11px] font-semibold leading-5 text-charcoal-deep"
+          >
+            {unreadNotifications > 9 ? "9+" : unreadNotifications}
+          </span>
+        )}
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-line bg-white p-2 shadow-lg">
-          <p className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate">
-            Notifications
-          </p>
-          {user ? (
-            <>
-              <ul>
-                {notifications.map((n) => (
-                  <li key={n.id}>
-                    <Link
-                      href={n.href ?? "/community"}
-                      onClick={() => setOpen(false)}
-                      className={`block rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-charcoal-deep/5 ${focus}`}
-                    >
-                      {n.text}
-                      <span className="block text-xs text-slate">{formatAge(n.ageMinutes)}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <p className="border-t border-line px-3 py-2 text-xs text-slate">
-                Sample notifications for the design preview. Real ones will appear once the backend is connected.
-              </p>
-            </>
+          <p className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate">Notifications</p>
+          {user && notifications.length > 0 ? (
+            <ul>
+              {notifications.map((n) => (
+                <li key={n.id}>
+                  <Link
+                    href={n.href ?? "/community"}
+                    onClick={close}
+                    className={`block rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-charcoal-deep/5 ${focus} ${n.read ? "text-slate" : "font-medium text-charcoal-deep"}`}
+                  >
+                    {!n.read && <span aria-hidden className="mr-2 inline-block size-2 rounded-full bg-bless align-middle" />}
+                    {n.text}
+                    <span className="block text-xs font-normal text-slate">{formatAge(n.ageMinutes)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           ) : (
-            <p className="px-3 py-3 text-sm text-slate">Sign in to see replies and appreciation on your posts.</p>
+            <p className="px-3 py-3 text-sm text-slate">Nothing yet. Replies and appreciation on your posts will show up here.</p>
           )}
         </div>
       )}
@@ -88,8 +106,17 @@ function Notifications() {
 }
 
 function Sidebar() {
+  const { isModerator, openReports } = useCommunity();
   return (
     <aside className="space-y-4" aria-label="Community information">
+      {isModerator && (
+        <section className="rounded-[22px] border border-line bg-white p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-deep">Moderation</h2>
+          <Link href="/community/moderation" className={`${secondaryBtn} mt-3 h-10 w-full`}>
+            Report queue{openReports ? ` (${openReports})` : ""}
+          </Link>
+        </section>
+      )}
       <section className="rounded-[22px] border border-line bg-white p-5">
         <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-deep">Community guidelines</h2>
         <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-slate">
@@ -115,50 +142,46 @@ function Sidebar() {
 }
 
 export function CommunityFeed() {
-  const { user, posts, comments, likedPosts, ageOf, requireAuth, setComposerOpen, getMember } = useCommunity();
+  const { user, posts, feed, loadFeed, loadMoreFeed, requireAuth, setComposerOpen, getMember } = useCommunity();
   const [tab, setTab] = useState<Tab>("feed");
   const [filter, setFilter] = useState<Filter>("latest");
   const [query, setQuery] = useState("");
   const composerRef = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const shareSomething = () => {
-    const go = () => {
-      setTab("feed");
-      setComposerOpen(true);
-      composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    };
-    if (requireAuth(go)) go();
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  /** Filters live on the server: any change fetches a fresh first page (search waits for a pause in typing). */
+  const run = (next: { tab: Tab; filter: Filter; query: string }, delay = 0) => {
+    setTab(next.tab);
+    setFilter(next.filter);
+    setQuery(next.query);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      void loadFeed({ tab: next.tab, filter: next.filter, q: next.query.trim() || undefined });
+    }, delay);
   };
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = posts.filter((p) => {
-      if (tab === "mine") return !!user && p.authorId === user.id;
-      return true;
-    });
-    if (filter === "media") list = list.filter((p) => p.attachments.length > 0);
-    if (q) {
-      list = list.filter((p) => {
-        const a = getMember(p.authorId);
-        return (
-          p.text.toLowerCase().includes(q) ||
-          a?.name.toLowerCase().includes(q) ||
-          a?.username.toLowerCase().includes(q) ||
-          p.attachments.some((x) => x.name.toLowerCase().includes(q))
-        );
-      });
-    }
-    const score = (p: (typeof posts)[number]) =>
-      p.baseLikes + (likedPosts.has(p.id) ? 1 : 0) + comments.filter((c) => c.postId === p.id).length * 2;
-    return [...list].sort((a, b) => (filter === "popular" ? score(b) - score(a) : ageOf(a) - ageOf(b)));
-  }, [posts, comments, tab, filter, query, user, likedPosts, ageOf, getMember]);
+  const shareSomething = () => {
+    if (!requireAuth()) return;
+    if (tab !== "feed") run({ tab: "feed", filter, query });
+    setComposerOpen(true);
+    composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  // The faces next to "Share Something": the distinct authors currently in the feed.
+  const voices = Array.from(new Set(posts.map((p) => p.authorId)))
+    .slice(0, 5)
+    .map((id) => getMember(id))
+    .filter((m): m is NonNullable<typeof m> => !!m);
+
+  const visible = posts;
+  const loading = feed.status === "loading";
 
   const chip = (active: boolean) =>
     `rounded-full border px-4 py-2 text-sm font-medium transition-colors ${focus} ${
       active ? "border-charcoal-deep bg-charcoal-deep text-white" : "border-line bg-white text-slate hover:border-slate/50 hover:text-charcoal-deep"
     }`;
-
-  const signedOutEmpty = !user && tab !== "feed";
 
   return (
     <main className="bg-ivory">
@@ -177,14 +200,16 @@ export function CommunityFeed() {
           <div className="flex gap-3">
             <button type="button" onClick={shareSomething} className={primaryBtn}>Share Something</button>
           </div>
-          <div className="flex items-center gap-3">
-            <ul className="flex -space-x-2" aria-label="Sample community members">
-              {SAMPLE_MEMBERS.filter((m) => m.id !== "u-demo").map((m) => (
-                <li key={m.id} className="rounded-full ring-2 ring-ivory"><Avatar member={m} size="sm" /></li>
-              ))}
-            </ul>
-            <span className="text-xs text-slate">Sample members</span>
-          </div>
+          {voices.length > 0 && (
+            <div className="flex items-center gap-3">
+              <ul className="flex -space-x-2" aria-label="Members sharing recently">
+                {voices.map((m) => (
+                  <li key={m.id} className="rounded-full ring-2 ring-ivory"><Avatar member={m} size="sm" /></li>
+                ))}
+              </ul>
+              <span className="text-xs text-slate">Recently sharing</span>
+            </div>
+          )}
         </div>
       </section>
 
@@ -198,7 +223,7 @@ export function CommunityFeed() {
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setTab(t.id)}
+                    onClick={() => run({ tab: t.id, filter, query })}
                     aria-current={tab === t.id ? "page" : undefined}
                     aria-label={t.label}
                     className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:px-3.5 ${focus} ${
@@ -225,14 +250,14 @@ export function CommunityFeed() {
                 id="community-search"
                 type="search"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => run({ tab, filter, query: e.target.value }, 300)}
                 placeholder="Search posts or people…"
                 className={`h-11 w-full rounded-xl border border-line bg-white pl-11 pr-4 text-sm placeholder:text-slate/70 ${focus}`}
               />
             </div>
             <div role="group" aria-label="Filter posts" className="flex flex-wrap gap-2">
               {FILTERS.map((f) => (
-                <button key={f.id} type="button" onClick={() => setFilter(f.id)} aria-pressed={filter === f.id} className={chip(filter === f.id)}>
+                <button key={f.id} type="button" onClick={() => run({ tab, filter: f.id, query })} aria-pressed={filter === f.id} className={chip(filter === f.id)}>
                   {f.label}
                 </button>
               ))}
@@ -244,35 +269,51 @@ export function CommunityFeed() {
           </div>
 
           {/* Feed */}
-          <div className="space-y-4" aria-live="polite">
-            {signedOutEmpty ? (
-              <EmptyState
-                title="Sign in to see your posts"
-                text="Your own posts appear here once you're signed in."
-                action={<button type="button" className={primaryBtn} onClick={() => requireAuth()}>Sign In</button>}
-              />
-            ) : visible.length === 0 ? (
-              <EmptyState
-                title={query ? "No matches" : tab === "mine" ? "You haven't posted yet" : "No posts to show"}
-                text={
-                  query
-                    ? `Nothing matches "${query}". Try a different word or name.`
-                    : tab === "mine"
-                      ? "Share something positive and it will appear here."
-                      : "Try a different filter."
-                }
-                action={
-                  query ? (
-                    <button type="button" className={secondaryBtn} onClick={() => setQuery("")}>Clear search</button>
-                  ) : tab === "mine" ? (
-                    <button type="button" className={primaryBtn} onClick={shareSomething}>Share Something</button>
-                  ) : undefined
-                }
-              />
+          <div className={`space-y-4 transition-opacity ${loading && visible.length > 0 ? "opacity-60" : ""}`} aria-live="polite" aria-busy={loading}>
+            {visible.length === 0 ? (
+              loading ? (
+                <div aria-hidden className="h-40 animate-pulse rounded-[22px] bg-white/70" />
+              ) : feed.status === "error" ? (
+                <EmptyState
+                  title="Could not load the feed"
+                  text="Please check your connection and try again."
+                  action={<button type="button" className={primaryBtn} onClick={() => run({ tab, filter, query })}>Try again</button>}
+                />
+              ) : (
+                <EmptyState
+                  title={query ? "No matches" : tab === "mine" ? "You have not posted yet" : "No posts to show"}
+                  text={
+                    query
+                      ? `Nothing matches "${query}". Try a different word or name.`
+                      : tab === "mine"
+                        ? "Share something positive and it will appear here."
+                        : filter === "media"
+                          ? "No posts with images or files yet."
+                          : "Be the first to share something with the community."
+                  }
+                  action={
+                    query ? (
+                      <button type="button" className={secondaryBtn} onClick={() => run({ tab, filter, query: "" })}>Clear search</button>
+                    ) : user ? (
+                      <button type="button" className={primaryBtn} onClick={shareSomething}>Share Something</button>
+                    ) : undefined
+                  }
+                />
+              )
             ) : (
               visible.map((p) => <PostCard key={p.id} post={p} />)
             )}
           </div>
+          {feed.status === "error" && visible.length > 0 && (
+            <p role="alert" className="text-center text-sm text-red-700">Could not load more. Please try again.</p>
+          )}
+          {feed.hasMore && visible.length > 0 && (
+            <div className="flex justify-center pt-2">
+              <button type="button" onClick={() => void loadMoreFeed()} disabled={loading} className={secondaryBtn}>
+                {loading ? "Loading…" : "Load more posts"}
+              </button>
+            </div>
+          )}
         </div>
         <div className="lg:sticky lg:top-6 lg:self-start">
           <Sidebar />

@@ -1,5 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CoverPhoto, TONE_CLASS } from "@/components/channels/illustrations";
+import { formatFollowers, formatSupporters } from "@/lib/channels";
+import { listChannelsPublic } from "@/server/cache/channels";
 
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
@@ -126,27 +129,6 @@ export function HowItWorks() {
 }
 
 /* ---------- 03 Explore channels ---------- */
-const CHANNELS = [
-  {
-    name: "Noble Soul",
-    handle: "@NobleSoul111",
-    text: "The words you need, when you need them.",
-    followers: "12.4K",
-    supporters: "318",
-    cover: "from-cream via-[#FFEBA8] to-bless/60",
-    initial: "N",
-  },
-  {
-    name: "The Guiding Light",
-    handle: "@GuidingLight",
-    text: "Thoughts, reflections and moments of encouragement.",
-    followers: "8.9K",
-    supporters: "204",
-    cover: "from-mist via-[#D9E6DE] to-sage/60",
-    initial: "G",
-  },
-];
-
 function CoverArt() {
   // Abstract line-drawn horizon in the same black-and-white pen style.
   return (
@@ -167,7 +149,10 @@ function CoverArt() {
   );
 }
 
-export function ExploreChannels() {
+export async function ExploreChannels() {
+  // The two most-followed channels. Cached for everyone, so this stays part of the static page.
+  const { items: channels } = await listChannelsPublic({ sort: "popular", limit: 2 });
+  if (channels.length === 0) return null;
   return (
     <section id="channels" className="bg-white pb-24 sm:pb-32">
       <div className={wrap}>
@@ -180,44 +165,49 @@ export function ExploreChannels() {
         </div>
 
         <div className="mt-14 grid gap-8 md:grid-cols-2">
-          {CHANNELS.map((c) => (
+          {channels.map((c) => (
             <article
               key={c.handle}
               className="group overflow-hidden rounded-[20px] border border-line bg-white shadow-[0_1px_2px_rgba(23,25,24,0.04)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_-18px_rgba(23,25,24,0.25)]"
             >
               <div
-                className={`relative h-44 bg-gradient-to-br sm:h-52 ${c.cover}`}
+                className={`relative h-44 bg-gradient-to-br sm:h-52 ${TONE_CLASS[c.cover.tone]}`}
               >
-                <CoverArt />
+                {c.coverUrl ? <CoverPhoto url={c.coverUrl} /> : <CoverArt />}
               </div>
               <div className="relative px-7 pb-7">
-                <div className="-mt-10 flex size-20 items-center justify-center rounded-full border-4 border-white bg-charcoal-deep text-2xl font-semibold text-bless">
-                  {c.initial}
+                <div className="-mt-10 flex size-20 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-charcoal-deep text-2xl font-semibold text-bless">
+                  {c.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- served from Supabase Storage's CDN
+                    <img src={c.avatarUrl} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+                  ) : (
+                    c.name.charAt(0)
+                  )}
                 </div>
                 <h3 className="mt-4 text-xl font-semibold tracking-tight text-charcoal-deep">
                   {c.name}
                 </h3>
-                <p className="text-sm text-slate">{c.handle}</p>
+                <p className="text-sm text-slate">@{c.handle}</p>
                 <p className="mt-3 leading-relaxed text-charcoal-deep/80">
-                  {c.text}
+                  {c.description}
                 </p>
                 <div className="mt-6 flex items-center justify-between gap-4 border-t border-line pt-5">
                   <dl className="flex gap-6 text-sm">
                     <div>
                       <dt className="text-slate">Followers</dt>
                       <dd className="font-semibold text-charcoal-deep">
-                        {c.followers}
+                        {formatFollowers(c.followers)}
                       </dd>
                     </div>
                     <div>
                       <dt className="text-slate">Supporters</dt>
                       <dd className="font-semibold text-charcoal-deep">
-                        {c.supporters}
+                        {formatSupporters(c.supporters)}
                       </dd>
                     </div>
                   </dl>
                   <Link
-                    href={`/channels/${c.handle.slice(1)}`}
+                    href={`/channels/${c.handle}`}
                     className={`shrink-0 whitespace-nowrap rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-charcoal-deep transition-colors hover:bg-mist ${focus}`}
                   >
                     View Channel

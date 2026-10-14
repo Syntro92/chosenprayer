@@ -1,4 +1,4 @@
-/** Shapes ready to map onto future backend entities. */
+/** Shapes shared by the community UI and the server (what the Server Actions return). */
 
 export type Role = "visitor" | "member" | "moderator";
 
@@ -19,10 +19,10 @@ export interface Attachment {
   name: string;
   size: number; // bytes
   mime: string;
-  /** Image source (data URI / object URL / CDN URL). */
+  /** Image source (short-lived signed URL, or a local object URL while composing). */
   src?: string;
   alt?: string;
-  /** Real, downloadable file (object URL or signed URL). Demo samples have none. */
+  /** Downloadable file (short-lived signed URL, or a local object URL while composing). */
   href?: string;
 }
 
@@ -31,12 +31,16 @@ export interface Post {
   authorId: string;
   text: string;
   attachments: Attachment[];
-  /** Age at the time the data was created. Avoids server/client clock drift. */
+  /** Age when the data was served. Avoids server/client clock drift. */
   ageMinutes: number;
-  /** Set only for items created in this browser session. */
+  /** Set only for items created in this browser session (so their age keeps ticking). */
   createdAt?: number;
+  /** Likes by everyone EXCEPT the viewer; the UI adds the viewer's own like on top. */
   baseLikes: number;
+  commentCount: number;
   edited?: boolean;
+  /** Pinned to the top of the feed by an admin. */
+  pinned?: boolean;
 }
 
 export interface Comment {
@@ -47,6 +51,7 @@ export interface Comment {
   ageMinutes: number;
   createdAt?: number;
   parentId?: string;
+  /** Likes by everyone EXCEPT the viewer. */
   baseLikes: number;
   edited?: boolean;
 }
@@ -58,8 +63,26 @@ export interface Notification {
   text: string;
   ageMinutes: number;
   href?: string;
+  read: boolean;
 }
 
 export interface DraftAttachment extends Attachment {
   file: File;
+}
+
+/* ---- Wire types returned by the community Server Actions ---- */
+
+export type PostDTO = Post & { likedByMe: boolean };
+export type CommentDTO = Comment & { likedByMe: boolean };
+
+export interface FeedPage {
+  posts: PostDTO[];
+  /** Everyone referenced by `posts`, so the UI can show names without extra requests. */
+  members: Member[];
+  nextCursor: string | null;
+}
+
+export interface NotificationsPage {
+  items: Notification[];
+  unread: number;
 }

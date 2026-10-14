@@ -15,6 +15,10 @@ function Thumb({ a, className = "" }: { a: Attachment; className?: string }) {
       {!loaded && <span aria-hidden className="absolute inset-0 animate-pulse bg-mist motion-reduce:animate-none" />}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        // Server-rendered images can finish loading before React attaches onLoad; catch that case here.
+        ref={(el) => {
+          if (el?.complete && el.naturalWidth > 0) setLoaded(true);
+        }}
         src={a.src}
         alt={a.alt ?? a.name}
         loading="lazy"
@@ -162,7 +166,7 @@ export function FileRow({ a }: { a: Attachment }) {
         <button
           type="button"
           aria-label={`Download ${a.name}`}
-          onClick={() => toast("Demo file: no real download is attached yet.", "info")}
+          onClick={() => toast("This file isn't available right now.", "info")}
           className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-slate transition-colors hover:bg-charcoal-deep/5 hover:text-charcoal-deep ${focus}`}
         >
           <Download size={18} aria-hidden />

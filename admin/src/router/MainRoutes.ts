@@ -37,6 +37,11 @@ const MainRoutes = {
       component: () => import('@/views/main/UsersPage.vue')
     },
     {
+      name: 'Add User',
+      path: '/users/new',
+      component: () => import('@/views/main/AddUserPage.vue')
+    },
+    {
       name: 'User Details',
       path: '/users/:id',
       component: () => import('@/views/main/UserDetailsPage.vue')
@@ -57,9 +62,9 @@ const MainRoutes = {
       component: () => import('@/views/main/SiteHealthPage.vue')
     },
     {
-      name: 'Feature Management',
-      path: '/features',
-      component: () => import('@/views/main/FeatureManagementPage.vue')
+      name: 'Audit Log',
+      path: '/audit',
+      component: () => import('@/views/main/AuditPage.vue')
     },
     {
       name: 'Settings',
