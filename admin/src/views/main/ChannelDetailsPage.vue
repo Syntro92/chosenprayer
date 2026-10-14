@@ -32,6 +32,9 @@ interface Channel {
   blessings: number;
   raisedCents: number;
   donationCount: number;
+  youtubeChannelId: string | null;
+  youtubeSubscribers: number | null;
+  youtubeSyncedAt: string | null;
   currency: string;
   owner: { name: string; username: string } | null;
   createdAt: string;
@@ -74,6 +77,8 @@ onMounted(async () => {
     const [c, cats] = await Promise.all([api.get<Channel>(`/channels/${id}`), api.get<{ slug: string; name: string }[]>('/categories')]);
     categories.value = cats;
     fill(c);
+    // Keep the subscriber count fresh: re-fetch from YouTube when it has never synced or is over an hour old.
+    if (c.youtubeChannelId && (!c.youtubeSyncedAt || Date.now() - new Date(c.youtubeSyncedAt).getTime() > 3600_000)) void syncYoutube(true);
   } catch (e) {
     loadError.value = errorMessage(e);
   }
@@ -112,6 +117,27 @@ async function save(e: Event) {
     saveError.value = errorMessage(err);
   } finally {
     saving.value = false;
+  }
+}
+
+// YouTube link: subscribers and recent videos are pulled in by the server (and refreshed daily).
+const ytInput = ref('');
+const ytBusy = ref(false);
+const ytMessage = ref('');
+const ytError = ref('');
+async function syncYoutube(quiet = false) {
+  ytBusy.value = true;
+  ytMessage.value = '';
+  ytError.value = '';
+  try {
+    const r = await api.post<{ videos: number }>(`/channels/${id}/youtube`, ytInput.value.trim() ? { youtubeChannel: ytInput.value.trim() } : {});
+    ytInput.value = '';
+    fill(await api.get<Channel>(`/channels/${id}`));
+    if (!quiet) ytMessage.value = `Synced. ${r.videos} recent video${r.videos === 1 ? '' : 's'} up to date.`;
+  } catch (err) {
+    if (!quiet) ytError.value = errorMessage(err);
+  } finally {
+    ytBusy.value = false;
   }
 }
 
@@ -155,9 +181,7 @@ async function changeStatus(note: string) {
         <template #action><v-chip :color="statusColor(channel.status)" variant="tonal">{{ label(channel.status) }}</v-chip></template>
         <div class="text-medium-emphasis mb-4">@{{ channel.handle }} · {{ channel.category }}</div>
         <v-row dense class="mb-2">
-          <v-col cols="6"><div class="text-caption text-disabled">Raised</div><div class="text-h4">{{ money(channel.raisedCents, channel.currency) }}</div></v-col>
-          <v-col cols="6"><div class="text-caption text-disabled">Gifts</div><div class="text-h4">{{ channel.donationCount }}</div></v-col>
-          <v-col cols="6"><div class="text-caption text-disabled">Followers</div><div class="text-h4">{{ channel.followers.toLocaleString() }}</div></v-col>
+          <v-col cols="6"><div class="text-caption text-disabled">Subscribers</div><div class="text-h4">{{ channel.youtubeChannelId ? (channel.youtubeSubscribers === null ? 'Hidden' : channel.youtubeSubscribers.toLocaleString()) : '—' }}</div></v-col>
           <v-col cols="6"><div class="text-caption text-disabled">Blessings</div><div class="text-h4">{{ channel.blessings }}</div></v-col>
         </v-row>
         <v-divider class="my-3" />
@@ -172,6 +196,21 @@ async function changeStatus(note: string) {
       </UiParentCard>
     </v-col>
     <v-col cols="12" lg="8">
+      <UiParentCard title="YouTube" class="mb-6">
+        <div v-if="channel.youtubeChannelId" class="mb-3">
+          <div class="text-h4">{{ channel.youtubeSubscribers === null ? 'Hidden' : channel.youtubeSubscribers.toLocaleString() }} <span class="text-body-2 text-disabled">subscribers</span></div>
+          <div class="text-body-2 text-medium-emphasis">
+            <a :href="`https://www.youtube.com/channel/${channel.youtubeChannelId}`" target="_blank" rel="noopener">{{ channel.youtubeChannelId }}</a> · last synced {{ dateOnly(channel.youtubeSyncedAt) }}
+          </div>
+        </div>
+        <div v-else class="text-body-2 text-medium-emphasis mb-3">Not linked to a YouTube channel.</div>
+        <div class="d-flex ga-2 align-start">
+          <v-text-field v-model="ytInput" :label="channel.youtubeChannelId ? 'Link a different channel (optional)' : 'YouTube channel ID'" placeholder="UCxxxxxxxxxxxxxxxxxxxxxx" hide-details="auto" density="comfortable" />
+          <v-btn color="primary" rounded="0" height="48" :loading="ytBusy" :disabled="!channel.youtubeChannelId && !ytInput.trim()" @click="syncYoutube()">{{ ytInput.trim() ? 'Link & sync' : 'Sync now' }}</v-btn>
+        </div>
+        <v-alert v-if="ytError" type="error" variant="tonal" class="mt-3">{{ ytError }}</v-alert>
+        <v-alert v-if="ytMessage" type="success" variant="tonal" class="mt-3">{{ ytMessage }}</v-alert>
+      </UiParentCard>
       <UiParentCard title="Edit details">
         <v-form @submit="save">
           <ImageUpload label="Channel image (profile picture)" shape="avatar" :path="form.avatarPath" :url="form.avatarUrl" hint="Square works best. Shown on cards and the channel page." @change="(v) => { form.avatarPath = v.path; form.avatarUrl = v.url; }" />

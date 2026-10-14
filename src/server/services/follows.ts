@@ -87,7 +87,7 @@ export async function listMyFollowing(
 
   type Row = {
     id: string; handle: string; name: string; description: string; category: string; category_slug: string;
-    follower_count: number; supporter_count: number; created_raw: string; followed_raw: string;
+    follower_count: number; supporter_count: number; youtube_subscribers: string | null; created_raw: string; followed_raw: string;
     cover_tone: ChannelSummary["cover"]["tone"]; cover_scene: ChannelSummary["cover"]["scene"];
     avatar_path: string | null; cover_path: string | null; featured: boolean; verified: boolean;
   };
@@ -95,7 +95,7 @@ export async function listMyFollowing(
   try {
     fetched = await rows<Row>(
       `select c.id, c.handle::text as handle, c.name, c.description, cat.name as category, cat.slug as category_slug,
-              c.follower_count, c.supporter_count,
+              c.follower_count, c.supporter_count, c.youtube_subscribers::text as youtube_subscribers,
               to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as created_raw,
               to_char(f.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as followed_raw,
               c.cover_tone, c.cover_scene, c.avatar_path, c.cover_path, c.featured, c.verified
@@ -124,6 +124,7 @@ export async function listMyFollowing(
       categorySlug: r.category_slug,
       followers: r.follower_count,
       supporters: r.supporter_count,
+      subscribers: r.youtube_subscribers == null ? null : Number(r.youtube_subscribers),
       createdAt: new Date(r.created_raw).toISOString(),
       cover: { tone: r.cover_tone, scene: r.cover_scene },
       avatarUrl: channelImageUrl(r.avatar_path),

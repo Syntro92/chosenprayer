@@ -3,7 +3,7 @@
 /** Limits in WHOLE currency units, as the support form works in whole dollars. */
 export const GIVING_LIMITS = { minAmount: 1, maxAmount: 999_999 } as const;
 
-export const DONATION_SOURCES = ["web", "social", "email", "offline", "other"] as const;
+export const DONATION_SOURCES = ["web", "mobile", "social", "email", "offline", "other"] as const;
 
 /**
  * A provider receipt link, or null. Only https pages on stripe.com are accepted, so a bad value can

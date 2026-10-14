@@ -48,10 +48,14 @@ const headers = [
   { title: 'Target', key: 'entityId', sortable: false },
   { title: 'Details', key: 'metadata', sortable: false }
 ];
+const value = (v: unknown): string => (Array.isArray(v) ? v.join(', ') : v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v));
+const label = (k: string) => k.replace(/([A-Z])/g, ' $1').toLowerCase();
 const details = (m: Record<string, unknown>) =>
   Object.entries(m)
-    .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    .filter(([k]) => k !== 'handle')
+    .map(([k, v]) => `${label(k)}: ${value(v)}`)
     .join(' · ');
+const target = (e: Entry) => (typeof e.metadata.handle === 'string' ? `@${e.metadata.handle}` : `${e.entityType} ${e.entityId?.slice(0, 8) ?? ''}`);
 </script>
 
 <template>
@@ -60,11 +64,11 @@ const details = (m: Record<string, unknown>) =>
     <v-select v-model="type" :items="[{ title: 'Everything', value: '' }, ...types.map((t) => ({ title: t, value: t }))]" label="Type" density="comfortable" hide-details variant="outlined" style="max-width: 240px" class="mb-4" />
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
     <v-data-table :headers="headers" :items="items" :loading="loading" :items-per-page="-1" hide-default-footer no-data-text="No entries.">
-      <template #item.createdAt="{ item }">{{ dateTime(item.createdAt) }}</template>
+      <template #item.createdAt="{ item }"><span class="text-no-wrap">{{ dateTime(item.createdAt) }}</span></template>
       <template #item.actor="{ item }">{{ item.actor ? item.actor.name : 'System' }}</template>
       <template #item.action="{ item }"><code>{{ item.action }}</code></template>
-      <template #item.entityId="{ item }"><span class="text-caption">{{ item.entityType }} {{ item.entityId?.slice(0, 8) }}</span></template>
-      <template #item.metadata="{ item }"><span class="text-caption text-medium-emphasis">{{ details(item.metadata) }}</span></template>
+      <template #item.entityId="{ item }"><span class="text-caption text-no-wrap">{{ target(item) }}</span></template>
+      <template #item.metadata="{ item }"><span class="text-caption text-medium-emphasis" style="word-break: break-word">{{ details(item.metadata) }}</span></template>
     </v-data-table>
     <div v-if="next" class="text-center mt-4"><v-btn variant="tonal" :loading="loading" @click="load(true)">Load more</v-btn></div>
   </UiParentCard>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CoverPhoto, TONE_CLASS } from "@/components/channels/illustrations";
-import { formatFollowers, formatSupporters } from "@/lib/channels";
+import { formatFollowers } from "@/lib/channels";
 import { listChannelsPublic } from "@/server/cache/channels";
 
 const focus =
@@ -194,15 +194,9 @@ export async function ExploreChannels() {
                 <div className="mt-6 flex items-center justify-between gap-4 border-t border-line pt-5">
                   <dl className="flex gap-6 text-sm">
                     <div>
-                      <dt className="text-slate">Followers</dt>
+                      <dt className="text-slate">Subscribers</dt>
                       <dd className="font-semibold text-charcoal-deep">
-                        {formatFollowers(c.followers)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-slate">Supporters</dt>
-                      <dd className="font-semibold text-charcoal-deep">
-                        {formatSupporters(c.supporters)}
+                        {c.subscribers == null ? "—" : formatFollowers(c.subscribers)}
                       </dd>
                     </div>
                   </dl>

@@ -5,6 +5,18 @@ import BaseBreadcrumb from '@/components/shared/BaseBreadcrumb.vue';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
 import ImageUpload from '@/components/shared/ImageUpload.vue';
 import { api, ApiError, errorMessage } from '@/utils/api';
+import { dateOnly } from '@/utils/format';
+
+interface YoutubePreview {
+  channelId: string;
+  title: string;
+  description: string;
+  handle: string | null;
+  thumbnailUrl: string | null;
+  subscribers: number | null;
+  videoCount: number;
+  videos: { videoId: string; title: string; publishedAt: string; thumbnailUrl: string | null }[];
+}
 
 const router = useRouter();
 const categories = ref<{ slug: string; name: string }[]>([]);
@@ -25,6 +37,10 @@ const form = ref({
   coverPath: null as string | null,
   coverUrl: null as string | null
 });
+const youtubeInput = ref('');
+const youtube = ref<YoutubePreview | null>(null);
+const fetching = ref(false);
+const youtubeError = ref('');
 const saving = ref(false);
 const error = ref('');
 const fieldErrors = ref<Record<string, string>>({});
@@ -37,6 +53,25 @@ onMounted(async () => {
     error.value = errorMessage(e);
   }
 });
+
+/** Look the channel up on YouTube, show what will be imported, and pre-fill empty fields from it. */
+async function fetchYoutube() {
+  fetching.value = true;
+  youtubeError.value = '';
+  youtube.value = null;
+  try {
+    const y = await api.get<YoutubePreview>('/youtube', { channel: youtubeInput.value });
+    youtube.value = y;
+    const f = form.value;
+    if (!f.name) f.name = y.title.slice(0, 80);
+    if (!f.description) f.description = y.description.split('\n')[0].slice(0, 200);
+    if (!f.handle && y.handle) f.handle = y.handle.toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 30);
+  } catch (err) {
+    youtubeError.value = errorMessage(err);
+  } finally {
+    fetching.value = false;
+  }
+}
 
 async function save(e: Event) {
   e.preventDefault();
@@ -56,6 +91,7 @@ async function save(e: Event) {
         .map((p) => p.trim())
         .filter(Boolean),
       ownerUsername: f.ownerUsername.trim() || undefined,
+      youtubeChannel: youtube.value?.channelId,
       status: f.status,
       featured: f.featured,
       verified: f.verified,
@@ -82,6 +118,29 @@ async function save(e: Event) {
     <v-col cols="12" md="8">
       <UiParentCard title="New channel">
         <v-form @submit="save">
+          <div class="mb-6">
+            <div class="d-flex ga-2 align-start">
+              <v-text-field variant="outlined" rounded="0" density="comfortable" v-model="youtubeInput" label="YouTube channel ID (optional)" placeholder="UCxxxxxxxxxxxxxxxxxxxxxx" hint="Paste the channel ID, a channel link or an @handle, then fetch. We import the subscriber count and recent videos." persistent-hint :error-messages="youtubeError" @keydown.enter.prevent="fetchYoutube" />
+              <v-btn color="primary" variant="tonal" rounded="0" height="48" :loading="fetching" :disabled="!youtubeInput.trim()" @click="fetchYoutube">Fetch</v-btn>
+            </div>
+            <v-card v-if="youtube" variant="tonal" rounded="0" class="mt-3 pa-4">
+              <div class="d-flex align-center ga-3 mb-3">
+                <v-avatar v-if="youtube.thumbnailUrl" size="48"><v-img :src="youtube.thumbnailUrl" /></v-avatar>
+                <div>
+                  <div class="text-subtitle-1">{{ youtube.title }}</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    {{ youtube.subscribers === null ? 'Subscribers hidden' : youtube.subscribers.toLocaleString() + ' subscribers' }} · {{ youtube.videoCount.toLocaleString() }} videos
+                  </div>
+                </div>
+              </div>
+              <div class="text-caption text-disabled mb-1">Recent videos that will be added to the channel</div>
+              <div v-for="v in youtube.videos" :key="v.videoId" class="text-body-2 d-flex justify-space-between ga-3">
+                <span class="text-truncate">{{ v.title }}</span><span class="text-disabled flex-shrink-0">{{ dateOnly(v.publishedAt) }}</span>
+              </div>
+              <div v-if="!youtube.videos.length" class="text-body-2 text-medium-emphasis">No public videos yet.</div>
+            </v-card>
+            <v-alert v-if="fieldErrors.youtubeChannel" type="error" variant="tonal" class="mt-3">{{ fieldErrors.youtubeChannel }}</v-alert>
+          </div>
           <ImageUpload label="Channel image (profile picture)" shape="avatar" :path="form.avatarPath" :url="form.avatarUrl" hint="Square works best. Shown on cards and the channel page." @change="(v) => { form.avatarPath = v.path; form.avatarUrl = v.url; }" />
           <ImageUpload label="Cover image" shape="cover" :path="form.coverPath" :url="form.coverUrl" hint="Wide image, about 1600 × 600. Leave empty to use the generated cover." @change="(v) => { form.coverPath = v.path; form.coverUrl = v.url; }" />
           <v-text-field variant="outlined" rounded="0" density="comfortable" v-model="form.handle" label="Handle (the web address)" prefix="@" hint="3–30 letters, numbers or underscores. It cannot be changed later." persistent-hint :error-messages="fieldErrors.handle" class="mb-3" />

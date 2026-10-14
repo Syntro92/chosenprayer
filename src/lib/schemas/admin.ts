@@ -12,7 +12,7 @@ const optional = <T extends z.ZodTypeAny>(s: T) => z.preprocess((v) => (v === ""
 
 export const CHANNEL_STATUSES = ["pending", "active", "paused", "archived"] as const;
 export const DONATION_STATUSES = ["pending", "succeeded", "failed", "refunded", "canceled"] as const;
-export const DONATION_SOURCES = ["web", "social", "email", "offline", "other"] as const;
+export const DONATION_SOURCES = ["web", "mobile", "social", "email", "offline", "other"] as const;
 export const ROLES = ["member", "moderator", "admin"] as const;
 export const ACCOUNT_STATUSES = ["active", "suspended"] as const;
 
@@ -55,7 +55,13 @@ export const createChannelSchema = z.object({
   status: z.enum(CHANNEL_STATUSES).default("active"),
   /** Optional: the member who runs this channel. */
   ownerUsername: optional(z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,30}$/, "Unknown username")),
+  /** Optional: YouTube channel ID (UC…), channel link or @handle. Subscribers and videos are fetched server-side. */
+  youtubeChannel: optional(text(200)),
 });
+
+export const youtubeChannelSchema = z.object({ channel: z.string().trim().min(1, "Enter a YouTube channel ID").max(200) });
+/** POST /channels/:id/youtube: with a value it (re)links the channel; without, it re-syncs the linked one. */
+export const youtubeSyncSchema = z.object({ youtubeChannel: optional(text(200)) });
 
 /** PATCH: any subset of the editable fields. The handle is the public URL, so it never changes. */
 export const updateChannelSchema = z

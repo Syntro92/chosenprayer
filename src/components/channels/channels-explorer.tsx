@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   formatFollowers,
-  formatSupporters,
   type Channel,
 } from "@/lib/channels";
 import { CoverArt, CoverPhoto, EmptyIllustration, TONE_CLASS } from "./illustrations";
@@ -51,15 +50,9 @@ function Stats({ channel }: { channel: Channel }) {
     <dl className="flex gap-6 text-sm">
       <div>
         <dd className="font-semibold text-charcoal-deep">
-          {formatFollowers(channel.followers)}
+          {channel.subscribers == null ? "—" : formatFollowers(channel.subscribers)}
         </dd>
-        <dt className="text-slate">followers</dt>
-      </div>
-      <div>
-        <dd className="font-semibold text-charcoal-deep">
-          {formatSupporters(channel.supporters)}
-        </dd>
-        <dt className="text-slate">supporters</dt>
+        <dt className="text-slate">subscribers</dt>
       </div>
     </dl>
   );

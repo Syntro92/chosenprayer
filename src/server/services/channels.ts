@@ -14,6 +14,7 @@ export interface ChannelSummary {
   categorySlug: string;
   followers: number;
   supporters: number;
+  subscribers: number | null; // YouTube subscribers (null = not linked / hidden)
   createdAt: string; // ISO timestamp
   cover: { tone: "cream" | "mist" | "sage" | "stone"; scene: "horizon" | "hills" | "sun" | "waves" };
   avatarUrl: string | null; // uploaded profile picture
@@ -64,6 +65,7 @@ interface SummaryRow {
   category_slug: string;
   follower_count: number;
   supporter_count: number;
+  youtube_subscribers: string | null;
   created_raw: string;
   cover_tone: ChannelSummary["cover"]["tone"];
   cover_scene: ChannelSummary["cover"]["scene"];
@@ -77,7 +79,7 @@ interface SummaryRow {
 
 const SUMMARY_COLUMNS = `
   c.id, c.handle::text as handle, c.name, c.description, cat.name as category, cat.slug as category_slug,
-  c.follower_count, c.supporter_count, to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as created_raw,
+  c.follower_count, c.supporter_count, c.youtube_subscribers::text as youtube_subscribers, to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as created_raw,
   c.cover_tone, c.cover_scene, c.avatar_path, c.cover_path, c.featured, c.verified, lower(c.name) as name_key`;
 
 const toSummary = (r: SummaryRow): ChannelSummary => ({
@@ -88,6 +90,7 @@ const toSummary = (r: SummaryRow): ChannelSummary => ({
   categorySlug: r.category_slug,
   followers: r.follower_count,
   supporters: r.supporter_count,
+  subscribers: r.youtube_subscribers == null ? null : Number(r.youtube_subscribers),
   createdAt: new Date(r.created_raw).toISOString(),
   cover: { tone: r.cover_tone, scene: r.cover_scene },
   avatarUrl: channelImageUrl(r.avatar_path),
@@ -221,8 +224,8 @@ export async function getChannelProfile(
   if (!parsed.success) throw new AppError("NOT_FOUND", "Channel not found.");
   const handle = parsed.data;
 
-  const base = await one<SummaryRow & { about: string[]; mission: string; blessing_count: number; show_blessings: boolean }>(
-    `select ${SUMMARY_COLUMNS}, c.about, c.mission, c.blessing_count, c.show_blessings
+  const base = await one<SummaryRow & { about: string[]; mission: string; blessing_count: number; show_blessings: boolean; youtube_channel_id: string | null }>(
+    `select ${SUMMARY_COLUMNS}, c.about, c.mission, c.blessing_count, c.show_blessings, c.youtube_channel_id
      from public.channels c join public.categories cat on cat.slug = c.category
      where c.handle = $1 and c.status = 'active'`,
     [handle],
@@ -249,7 +252,7 @@ export async function getChannelProfile(
             youtube_id, cover_tone, cover_scene
      from public.channel_content
      where channel_id = $1 and published_at is not null and published_at <= now()
-     order by published_at desc limit 12`,
+     order by published_at desc limit 3`,
     [base.id],
     conn,
   );
@@ -268,6 +271,7 @@ export async function getChannelProfile(
     channel: toSummary(base),
     data: {
       about: base.about,
+      ...(base.youtube_channel_id ? { youtubeUrl: `https://www.youtube.com/channel/${base.youtube_channel_id}` } : {}),
       mission: base.mission,
       links,
       content: content.map((c) => ({

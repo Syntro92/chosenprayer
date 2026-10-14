@@ -25,6 +25,8 @@ export type Channel = {
   categorySlug: string;
   followers: number;
   supporters: number;
+  /** YouTube subscribers; null/absent when no YouTube channel is linked or the owner hides the count. */
+  subscribers?: number | null;
   createdAt: string; // ISO timestamp, used for "Newest"
   cover: { tone: CoverTone; scene: CoverScene };
   /** Uploaded profile picture / cover photo. Absent: the initial-letter avatar and generated cover are shown. */
@@ -55,6 +57,8 @@ export type Blessing = {
 };
 
 export type ChannelProfileData = {
+  /** Link to the channel on YouTube ("View all content"); absent when none is linked. */
+  youtubeUrl?: string;
   about: string[];
   mission: string;
   links: { label: string; href: string }[];

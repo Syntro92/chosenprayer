@@ -31,6 +31,9 @@ const schema = z.object({
   // Must be an address on a domain verified in Mailtrap (e.g. chosenprayer.com).
   EMAIL_FROM: z.string().email().optional(),
   EMAIL_FROM_NAME: z.string().default("Chosen Prayer"),
+
+  // YouTube Data API v3 key (Google Cloud Console > APIs & Services > Credentials). Needed to link channels.
+  YOUTUBE_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

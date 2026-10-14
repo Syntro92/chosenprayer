@@ -1,1 +1,0 @@
-import{_ as e}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{o as s,s as a,b as r}from"./index-D0TfxDWp.js";const t={},n={class:"logo"};function c(_,o){return s(),a("div",n,o[0]||(o[0]=[r("span",{class:"logo-name"},"Chosen Prayer",-1)]))}const m=e(t,[["render",c],["__scopeId","data-v-a516be1a"]]);export{m as L};

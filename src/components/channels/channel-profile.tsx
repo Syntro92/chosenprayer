@@ -34,7 +34,7 @@ const eyebrow =
 const h2 =
   "mt-3 text-3xl font-semibold leading-[1.1] tracking-tight text-charcoal-deep sm:text-4xl";
 
-const PRESETS = [11, 25, 55, 111, 555] as const;
+const PRESETS = [5, 11, 25, 55, 111, 555] as const;
 type Frequency = "once" | "monthly";
 type Amount = number | "custom";
 
@@ -162,7 +162,7 @@ export function SupportForm({
         aria-label="Amount"
         className="mt-4 grid grid-cols-4 gap-2"
       >
-        {PRESETS.slice(0, 4).map((n) => (
+        {PRESETS.map((n) => (
           <button
             key={n}
             type="button"
@@ -174,23 +174,12 @@ export function SupportForm({
             ${n}
           </button>
         ))}
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={value.amount === 555}
-          onClick={() => set({ amount: 555 })}
-          className={chip(value.amount === 555)}
-        >
-          $555
-        </button>
         <button
           type="button"
           role="radio"
           aria-checked={value.amount === "custom"}
           onClick={() => set({ amount: "custom" })}
-          className={chip(value.amount === "custom")}
+          className={`col-span-2 ${chip(value.amount === "custom")}`}
         >
           Custom
         </button>
@@ -220,8 +209,8 @@ export function SupportForm({
         className="mt-5 w-full"
       >
         {ready
-          ? `Continue · ${money(amount)}${value.frequency === "monthly" ? "/mo" : ""}`
-          : "Continue"}
+          ? `Support · ${money(amount)}${value.frequency === "monthly" ? "/mo" : ""}`
+          : "Support"}
       </OriginButton>
 
       {paused && (
@@ -232,7 +221,7 @@ export function SupportForm({
       <p className="mt-4 text-center text-sm text-slate">
         Your contribution is voluntary.
         <br />
-        Secure payment.
+        Secure payment with Stripe.
       </p>
     </div>
   );
@@ -337,6 +326,7 @@ export function SupportModal({
         frequency: value.frequency,
         donorEmail: signedIn ? undefined : email.trim(),
         donorName: signedIn ? undefined : guestName.trim() || undefined,
+        source: /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent) ? "mobile" : "web",
         idempotencyKey: attemptKey.current,
       });
       if (!started.ok) {
@@ -532,7 +522,7 @@ export function SupportModal({
               </p>
             )}
             <p className="mt-4 text-sm text-slate">
-              Your contribution is voluntary. Secure payment.
+              Your contribution is voluntary. Secure payment with Stripe.
             </p>
             {error && (
               <p role="alert" className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -827,7 +817,7 @@ export function ChannelProfile({
   // Follow state: the page itself is cached for everyone, so "do I follow this?" is
   // fetched per viewer after load. Until it arrives the button is a disabled "Follow".
   const [follow, setFollow] = useState({ ready: false, signedIn: false, following: false });
-  const [followers, setFollowers] = useState(channel.followers);
+  const [, setFollowers] = useState(channel.followers);
   const [followError, setFollowError] = useState("");
   const [, startFollow] = useTransition();
   const following = follow.following;
@@ -974,8 +964,7 @@ export function ChannelProfile({
 
             <dl className="mt-7 flex gap-8 sm:gap-12">
               {[
-                [formatFollowers(followers), "Followers"],
-                [formatSupporters(channel.supporters), "Supporters"],
+                [channel.subscribers == null ? "—" : formatFollowers(channel.subscribers), "Subscribers"],
                 ...(data.showBlessings ? [[formatFollowers(blessingCount), "Blessings"]] : []),
               ].map(([n, label]) => (
                 <div key={label}>
@@ -1085,9 +1074,6 @@ export function ChannelProfile({
                     <h3 className="mt-2 text-lg font-semibold leading-snug tracking-tight text-charcoal-deep">
                       {c.title}
                     </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate">
-                      {c.excerpt}
-                    </p>
                     <p className="mt-4 text-xs text-slate">
                       {formatDate(c.date)}
                     </p>
@@ -1095,11 +1081,13 @@ export function ChannelProfile({
                 </article>
               ))}
             </div>
-            <div className="mt-8">
-              <Link href={`/channels/${channel.handle}/content`} className={ghostBtn}>
-                View All Content
-              </Link>
-            </div>
+            {data.youtubeUrl && (
+              <div className="mt-8">
+                <a href={data.youtubeUrl} target="_blank" rel="noopener noreferrer" className={ghostBtn}>
+                  View All Content
+                </a>
+              </div>
+            )}
           </section>
 
           {/* Community */}

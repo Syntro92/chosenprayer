@@ -55,7 +55,7 @@ const opts = (values: string[], all: string) => [{ title: all, value: '' }, ...v
       <v-row dense>
         <v-col cols="12" md="3"><v-text-field v-model="filters.q" label="Search donor, email, channel or ID" density="comfortable" hide-details clearable variant="outlined" /></v-col>
         <v-col cols="6" md="2"><v-select v-model="filters.status" :items="opts(['succeeded', 'pending', 'failed', 'refunded', 'canceled'], 'All statuses')" label="Status" density="comfortable" hide-details variant="outlined" /></v-col>
-        <v-col cols="6" md="2"><v-select v-model="filters.source" :items="opts(['web', 'social', 'email', 'offline', 'other'], 'All sources')" label="Source" density="comfortable" hide-details variant="outlined" /></v-col>
+        <v-col cols="6" md="2"><v-select v-model="filters.source" :items="opts(['web', 'mobile', 'social', 'email', 'offline', 'other'], 'All sources')" label="Source" density="comfortable" hide-details variant="outlined" /></v-col>
         <v-col cols="6" md="2"><v-text-field v-model="filters.from" label="From" type="date" density="comfortable" hide-details variant="outlined" /></v-col>
         <v-col cols="6" md="2"><v-text-field v-model="filters.to" label="To" type="date" density="comfortable" hide-details variant="outlined" /></v-col>
         <v-col v-if="filters.channel" cols="12" md="3" class="d-flex align-center">

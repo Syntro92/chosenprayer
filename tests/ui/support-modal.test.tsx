@@ -71,7 +71,7 @@ function setup(over: Partial<{ signedIn: boolean; value: Support; config: Giving
   return { user, onBlessing, onClose };
 }
 /** choose -> confirm */
-const toConfirm = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: /^Continue/ }));
+const toConfirm = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: /^Support/ }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,7 +91,7 @@ describe("SupportForm", () => {
 
   it("lets you continue with a valid amount", async () => {
     const onContinue = renderForm(config);
-    await userEvent.click(screen.getByRole("button", { name: /Continue/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Support/ }));
     expect(onContinue).toHaveBeenCalled();
   });
   it("disables monthly giving when it's switched off", () => {
@@ -102,11 +102,11 @@ describe("SupportForm", () => {
   it("shows a notice and blocks Continue while giving is paused", () => {
     renderForm({ ...config, available: false });
     expect(screen.getByRole("status")).toHaveTextContent("Giving is paused right now");
-    expect(screen.getByRole("button", { name: /Continue/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Support/ })).toBeDisabled();
   });
   it("blocks amounts above the maximum", () => {
     renderForm(config, { frequency: "once", amount: "custom", custom: "1000000" });
-    expect(screen.getByRole("button", { name: /Continue/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Support/ })).toBeDisabled();
   });
 });
 
@@ -251,7 +251,7 @@ describe("SupportModal: paying", () => {
     await toConfirm(user);
     await user.click(screen.getByRole("button", { name: "Send $25" }));
     await user.click(await screen.findByRole("button", { name: "Back from card" }));
-    expect(screen.getByRole("button", { name: /^Continue/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Support/ })).toBeInTheDocument();
     expect(screen.queryByTestId("card-form")).not.toBeInTheDocument();
   });
 

@@ -9,6 +9,8 @@ import { likePattern } from "./community-shared";
 import { notify } from "./notifications";
 import { CHANNEL_IMAGE_BUCKET } from "@/lib/channels";
 import { channelImageUrl, channelImages } from "../storage";
+import { fetchYoutubeChannel } from "../providers/youtube";
+import { saveYoutubeData } from "./youtube";
 
 export interface AdminChannel {
   id: string;
@@ -41,6 +43,9 @@ export interface AdminChannelDetail extends AdminChannel {
   avatarUrl: string | null;
   coverUrl: string | null;
   donationCount: number;
+  youtubeChannelId: string | null;
+  youtubeSubscribers: number | null;
+  youtubeSyncedAt: string | null;
 }
 
 export interface AdminPage<T> {
@@ -57,6 +62,7 @@ interface Row {
   owner_id: string | null; owner_name: string | null; owner_username: string | null;
   created_at: string; published_at: string | null;
   mission?: string; about?: string[]; cover_tone?: string; cover_scene?: string; avatar_path?: string | null; cover_path?: string | null; donation_count?: number;
+  youtube_channel_id?: string | null; youtube_subscribers?: string | null; youtube_synced_at?: string | null;
 }
 
 const SELECT = `
@@ -66,6 +72,7 @@ const SELECT = `
          c.owner_id, o.display_name as owner_name, o.username::text as owner_username,
          c.created_at::text as created_at, c.published_at::text as published_at,
          c.mission, c.about, c.cover_tone::text as cover_tone, c.cover_scene::text as cover_scene, c.avatar_path, c.cover_path,
+         c.youtube_channel_id, c.youtube_subscribers::text as youtube_subscribers, c.youtube_synced_at::text as youtube_synced_at,
          (select count(*)::int from public.donations d where d.channel_id = c.id and d.status = 'succeeded') as donation_count
   from public.channels c
   join public.categories cat on cat.slug = c.category
@@ -103,6 +110,9 @@ const toDetail = (r: Row): AdminChannelDetail => ({
   avatarUrl: channelImageUrl(r.avatar_path),
   coverUrl: channelImageUrl(r.cover_path),
   donationCount: r.donation_count ?? 0,
+  youtubeChannelId: r.youtube_channel_id ?? null,
+  youtubeSubscribers: r.youtube_subscribers == null ? null : Number(r.youtube_subscribers),
+  youtubeSyncedAt: r.youtube_synced_at ? new Date(r.youtube_synced_at).toISOString() : null,
 });
 
 /** Every referenced image must really be in the bucket (uploaded through the admin endpoint). */
@@ -165,6 +175,8 @@ export interface ChannelChange {
 export async function createAdminChannel(actor: Actor | null, raw: unknown, conn: Queryable = db): Promise<ChannelChange> {
   const a = requireRole(actor, "admin");
   const input = createChannelSchema.parse(raw);
+  // Fetch from YouTube first (network, outside the transaction); a bad ID fails before anything is saved.
+  const yt = input.youtubeChannel ? await fetchYoutubeChannel(input.youtubeChannel) : null;
 
   return inTransaction(conn, async (c) => {
     const category = await one("select 1 as ok from public.categories where slug = $1", [input.category], c);
@@ -190,12 +202,13 @@ export async function createAdminChannel(actor: Actor | null, raw: unknown, conn
       [input.handle, ownerId, input.name, input.description, input.about, input.mission, input.category, input.coverTone, input.coverScene, input.status, input.featured, input.verified, input.currency, input.showBlessings, input.avatarPath ?? null, input.coverPath ?? null],
       c,
     );
+    if (yt) await saveYoutubeData(c, created!.id, yt);
     await audit(c, {
       actorId: a.userId,
       action: "channel.create",
       entityType: "channel",
       entityId: created!.id,
-      metadata: { handle: input.handle, status: input.status },
+      metadata: { handle: input.handle, status: input.status, ...(yt ? { youtube: yt.channelId } : {}) },
     });
     const detail = toDetail((await one<Row>(`${SELECT} where c.id = $1`, [created!.id], c))!);
     return { channel: detail, handle: detail.handle };

@@ -247,6 +247,7 @@ const CRON_JOBS = [
   { job: "email", maxMinutes: 15 },
   { job: "sweep", maxMinutes: 24 * 60 },
   { job: "cleanup", maxMinutes: 36 * 60 },
+  { job: "youtube", maxMinutes: 36 * 60 },
 ];
 
 export async function getHealth(actor: Actor | null, provider: { name: string; testMode: boolean }, conn: Queryable = db): Promise<Health> {
