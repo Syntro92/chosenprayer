@@ -985,6 +985,17 @@ export function ChannelProfile({
                 <Heart className="size-4" />
                 Support This Channel
               </OriginButton>
+              {data.youtubeUrl ? (
+                // sub_confirmation=1 opens the channel with YouTube's "Subscribe?" prompt already showing.
+                <a
+                  href={`${data.youtubeUrl}?sub_confirmation=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex h-12 items-center justify-center rounded-xl border border-charcoal-deep bg-charcoal-deep px-5 text-sm font-semibold text-white transition hover:bg-charcoal-deep/90 active:scale-[0.98] ${focus}`}
+                >
+                  Subscribe
+                </a>
+              ) : (
               <button
                 type="button"
                 aria-pressed={following}
@@ -998,6 +1009,7 @@ export function ChannelProfile({
               >
                 {following ? "Following" : "Follow"}
               </button>
+              )}
               <button
                 type="button"
                 onClick={share}

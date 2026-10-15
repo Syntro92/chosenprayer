@@ -1,4 +1,3 @@
-import { CrowdLoader } from "@/components/ui/crowd-loader";
 import { LoaderSkeleton } from "@/components/ui/loaders-skeleton";
 
 export default function Loading() {
@@ -9,7 +8,6 @@ export default function Loading() {
       aria-label="Loading"
     >
       <div className="flex w-full max-w-3xl flex-col items-center gap-5">
-        <CrowdLoader className="mb-6" />
         <LoaderSkeleton className="bg-line dark:bg-line" width={140} height={12} />
         <LoaderSkeleton className="bg-line dark:bg-line" width="80%" height={44} borderRadius={10} />
         <LoaderSkeleton className="bg-line dark:bg-line" width="55%" height={44} borderRadius={10} />

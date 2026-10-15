@@ -1,4 +1,3 @@
-import { CrowdLoader } from "@/components/ui/crowd-loader";
 import { LoaderSkeleton } from "@/components/ui/loaders-skeleton";
 
 const tone = "bg-line dark:bg-line";
@@ -7,7 +6,6 @@ export default function Loading() {
   return (
     <main className="min-h-screen bg-ivory" aria-busy="true" aria-label="Loading channels">
       <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5 px-4 pb-12 pt-32 sm:pb-16 sm:pt-44">
-        <CrowdLoader className="mb-4" />
         <LoaderSkeleton className={tone} width={150} height={12} />
         <LoaderSkeleton className={tone} width="85%" height={48} borderRadius={10} />
         <LoaderSkeleton className={tone} width="60%" height={16} />
