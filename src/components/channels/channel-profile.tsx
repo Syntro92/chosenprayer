@@ -34,7 +34,7 @@ const eyebrow =
 const h2 =
   "mt-3 text-3xl font-semibold leading-[1.1] tracking-tight text-charcoal-deep sm:text-4xl";
 
-const PRESETS = [5, 11, 25, 55, 111, 555] as const;
+const PRESETS = [5, 11, 25, 55, 111, 555, 999] as const;
 type Frequency = "once" | "monthly";
 type Amount = number | "custom";
 
@@ -179,7 +179,7 @@ export function SupportForm({
           role="radio"
           aria-checked={value.amount === "custom"}
           onClick={() => set({ amount: "custom" })}
-          className={`col-span-2 ${chip(value.amount === "custom")}`}
+          className={chip(value.amount === "custom")}
         >
           Custom
         </button>

@@ -21,6 +21,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Chosen Prayer",
   description: "Discover meaningful channels, connect with the work you value, and give something back.",
+  icons: { icon: "/favicon.webp", shortcut: "/favicon.webp", apple: "/favicon.webp" },
 };
 
 /** Reads the session per request, so it lives behind Suspense and the rest of the shell stays static. */
