@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -43,7 +44,7 @@ async function Content({ params }: { params: Promise<{ username: string }> }) {
 
 export default function MemberPage({ params }: { params: Promise<{ username: string }> }) {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-ivory" />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Content params={params} />
     </Suspense>
   );

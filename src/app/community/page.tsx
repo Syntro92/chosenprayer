@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { CommunityProvider } from "@/components/community/community-provider";
@@ -40,7 +41,7 @@ async function CommunityHome() {
 
 export default function CommunityPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-ivory" />}>
+    <Suspense fallback={<PageSkeleton />}>
       <CommunityHome />
     </Suspense>
   );

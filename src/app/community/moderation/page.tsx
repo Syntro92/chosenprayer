@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -23,7 +24,7 @@ async function Queue() {
 
 export default function ModerationPage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-ivory" />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Queue />
     </Suspense>
   );
