@@ -16,16 +16,19 @@ export interface Header {
  *  - Stripe: its card form is an iframe from js.stripe.com (plus hooks.stripe.com for bank 3-D Secure
  *    challenges) and talks to api.stripe.com; cards never touch our servers.
  */
+// Free page translation (components/page-translator.tsx) loads Google's widget script and its styles.
+const GOOGLE_TRANSLATE_SCRIPT = ["https://translate.google.com", "https://translate.googleapis.com", "https://translate-pa.googleapis.com", "https://www.gstatic.com"];
+
 export function contentSecurityPolicy(opts: { dev?: boolean } = {}): string {
   const dev = !!opts.dev;
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
-    "script-src": ["'self'", "'unsafe-inline'", "https://js.stripe.com", ...(dev ? ["'unsafe-eval'"] : [])],
-    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    "script-src": ["'self'", "'unsafe-inline'", "https://js.stripe.com", ...GOOGLE_TRANSLATE_SCRIPT, ...(dev ? ["'unsafe-eval'"] : [])],
+    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://translate.googleapis.com", "https://www.gstatic.com"],
     "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
     "img-src": ["'self'", "data:", "blob:", "https:"],
     "media-src": ["'self'", "https://*.supabase.co"],
-    "connect-src": ["'self'", "https://*.supabase.co", "https://api.stripe.com", "https://merchant-ui-api.stripe.com", ...(dev ? ["ws://localhost:*", "ws://127.0.0.1:*"] : [])],
+    "connect-src": ["'self'", "https://*.supabase.co", "https://translate.googleapis.com", "https://translate-pa.googleapis.com", "https://api.stripe.com", "https://merchant-ui-api.stripe.com", ...(dev ? ["ws://localhost:*", "ws://127.0.0.1:*"] : [])],
     "frame-src": ["https://www.youtube-nocookie.com", "https://js.stripe.com", "https://hooks.stripe.com", "https://m.stripe.network"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],

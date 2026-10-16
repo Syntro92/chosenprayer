@@ -17,42 +17,57 @@ declare global {
   }
 }
 
-function applyLanguage(code: string) {
-  const combo = document.querySelector<HTMLSelectElement>(".goog-te-combo");
-  if (!combo) return false;
-  combo.value = code === "en" ? "" : code;
-  combo.dispatchEvent(new Event("change"));
-  return true;
+const COOKIE = "googtrans";
+
+function readCookie(): string {
+  const m = document.cookie.match(new RegExp(`(?:^|; )${COOKIE}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : "";
 }
 
-/** Translates the page with Google Translate, driven by the footer/header language selector. */
+/** Google Translate reads this cookie on load; clearing it is the only reliable way back to English. */
+function writeCookie(code: string) {
+  const host = location.hostname;
+  const expire = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  document.cookie = `${COOKIE}=; ${expire}; path=/`;
+  document.cookie = `${COOKIE}=; ${expire}; path=/; domain=${host}`;
+  document.cookie = `${COOKIE}=; ${expire}; path=/; domain=.${host}`;
+  if (code !== "en") document.cookie = `${COOKIE}=/en/${code}; path=/; max-age=31536000; samesite=lax`;
+}
+
+/**
+ * Translates the page with Google Translate, driven by the header/footer language selector.
+ * The cookie is the source of truth: when it differs from the chosen language we rewrite it and
+ * reload once, so switching (including back to English) is always clean.
+ */
 export function PageTranslator() {
-  const lang = useLanguage();
-  const code = lang.code.toLowerCase();
+  const hookCode = useLanguage().code.toLowerCase();
 
   useEffect(() => {
-    if (code === "en" && !document.cookie.includes("googtrans=")) return;
-
-    if (applyLanguage(code)) return;
-    if (document.getElementById("google-translate-script")) return;
+    // On first mount the hook still reports the server default (EN), so read the saved choice directly.
+    let code = hookCode;
+    try {
+      code = (localStorage.getItem("language") ?? "EN").toLowerCase();
+    } catch {}
+    const wanted = code === "en" ? "" : `/en/${code}`;
+    if (readCookie() !== wanted) {
+      writeCookie(code);
+      location.reload();
+      return;
+    }
+    if (code === "en" || document.getElementById("google-translate-script")) return;
 
     window.googleTranslateElementInit = () => {
       new window.google!.translate.TranslateElement(
         { pageLanguage: "en", autoDisplay: false },
         "google_translate_element",
       );
-      const t = setInterval(() => {
-        if (applyLanguage(code)) clearInterval(t);
-      }, 100);
-      setTimeout(() => clearInterval(t), 5000);
     };
     const s = document.createElement("script");
     s.id = "google-translate-script";
-    s.src =
-      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    s.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
     s.async = true;
     document.body.appendChild(s);
-  }, [code]);
+  }, [hookCode]);
 
   return <div id="google_translate_element" className="hidden" translate="no" />;
 }

@@ -8,7 +8,7 @@ import { LANGUAGES } from "@/lib/languages";
 import { setLanguage, useLanguage } from "@/lib/language-store";
 
 /** `undefined` = still loading (show no auth controls), `null` = signed out. */
-export type HeaderSession = { displayName: string; username: string } | null | undefined;
+export type HeaderSession = { displayName: string; username: string; locale?: string } | null | undefined;
 
 const NAV = [
   { label: "Home", href: "/" },
@@ -230,6 +230,19 @@ function MainNav(props: NavLinksProps) {
 export function Header({ session }: { session?: HeaderSession }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const savedLocale = session?.locale;
+
+  // The profile language is the default: apply it unless this browser already has its own choice.
+  useEffect(() => {
+    if (!savedLocale) return;
+    try {
+      if (localStorage.getItem("language")) return;
+    } catch {
+      return;
+    }
+    const l = LANGUAGES.find((x) => x.code === savedLocale);
+    if (l) setLanguage(l);
+  }, [savedLocale]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);

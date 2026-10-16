@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useEffect, useId } from "react";
+import { setLanguage } from "@/lib/language-store";
 import { changePasswordAction, deleteAccountAction, updateProfileAction } from "@/actions/account";
 import { TONE_CLASS } from "@/lib/avatar";
 import { fieldError, type FormState } from "@/lib/forms";
@@ -53,6 +54,14 @@ function Status({ state }: { state: FormState }) {
 export function ProfileForm({ profile }: { profile: MyProfile }) {
   const [state, action, pending] = useActionState<FormState, FormData>(updateProfileAction, null);
   const v = state?.values;
+
+  // Saving a language makes it the site language straight away (and the default on other devices).
+  useEffect(() => {
+    if (!state?.ok) return;
+    const l = LANGUAGES.find((x) => x.code === state.values?.locale);
+    if (l) setLanguage(l);
+  }, [state]);
+
   return (
     <section className={card} aria-labelledby="profile-h">
       <h2 id="profile-h" className="text-xl font-semibold tracking-tight text-charcoal-deep">Profile</h2>

@@ -9,6 +9,7 @@ import { createSupabaseServerClient } from "./supabase";
 interface ProfileRow {
   username: string;
   display_name: string;
+  locale: string;
   role: Role;
   status: AccountStatus;
   must_change_password: boolean;
@@ -35,7 +36,7 @@ export const getActor = cache(async (): Promise<Actor | null> => {
     if (error || !data.user) return null;
 
     const profile = await one<ProfileRow>(
-      "select username, display_name, role, status, must_change_password from public.profiles where id = $1",
+      "select username, display_name, locale, role, status, must_change_password from public.profiles where id = $1",
       [data.user.id],
     );
     if (!profile) return null;
@@ -44,6 +45,7 @@ export const getActor = cache(async (): Promise<Actor | null> => {
       userId: data.user.id,
       username: profile.username,
       displayName: profile.display_name,
+      locale: profile.locale,
       role: profile.role,
       status: profile.status,
       mustChangePassword: profile.must_change_password,

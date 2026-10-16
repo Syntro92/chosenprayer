@@ -98,7 +98,7 @@ describe("security headers", () => {
     expect(csp).toContain("form-action 'self'");
     expect(csp).toContain("upgrade-insecure-requests");
     expect(csp).not.toContain("unsafe-eval");
-    expect(csp).toMatch(/script-src 'self' 'unsafe-inline' https:\/\/js\.stripe\.com(;|$)/);
+    expect(csp).toMatch(/script-src 'self' 'unsafe-inline' https:\/\/js\.stripe\.com https:\/\/translate\.google\.com https:\/\/translate\.googleapis\.com https:\/\/translate-pa\.googleapis\.com https:\/\/www\.gstatic\.com(;|$)/);
     expect(csp).toContain("https://api.stripe.com");
     expect(csp).toContain("https://hooks.stripe.com");
     expect(csp).toContain("https://*.supabase.co");

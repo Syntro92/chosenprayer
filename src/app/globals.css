@@ -67,3 +67,19 @@ body {
     animation: none;
   }
 }
+
+/* Google Translate injects a top banner and shifts the page down; the site's own language
+   selector drives it, so hide the banner, tooltip and highlight. */
+.skiptranslate:has(> iframe.skiptranslate),
+iframe.skiptranslate,
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+body {
+  top: 0 !important;
+}
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}

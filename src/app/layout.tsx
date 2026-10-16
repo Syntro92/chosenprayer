@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 /** Reads the session per request, so it lives behind Suspense and the rest of the shell stays static. */
 async function SessionHeader() {
   const actor = await getActor();
-  return <Header session={actor ? { displayName: actor.displayName, username: actor.username } : null} />;
+  return <Header session={actor ? { displayName: actor.displayName, username: actor.username, locale: actor.locale } : null} />;
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

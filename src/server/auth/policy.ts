@@ -11,6 +11,8 @@ export interface Actor {
   userId: string;
   username: string;
   displayName: string;
+  /** Saved language code (profile default), e.g. "ES". */
+  locale?: string;
   role: Role;
   status: AccountStatus;
   /** Signed in with an admin-issued temporary password that has not been replaced yet. */
