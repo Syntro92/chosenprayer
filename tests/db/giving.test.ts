@@ -53,7 +53,7 @@ const outbox = async (c: Queryable, to?: string) =>
 /* ======================================================================== */
 describe("getGivingConfig", () => {
   it("reports test mode and the limits", async () => {
-    expect(await getGivingConfig()).toMatchObject({ provider: "mock", available: true, recurring: true, minAmount: 1, maxAmount: 999_999 });
+    expect(await getGivingConfig()).toMatchObject({ provider: "mock", available: true, recurring: true, minAmount: 5, maxAmount: 999_999 });
   });
 });
 
@@ -105,7 +105,7 @@ describe("startDonation", () => {
       await expect(bad({ idempotencyKey: "short" })).rejects.toMatchObject({ name: "ZodError" });
       await expect(start(c, null, { handle: "no_such_channel_zz" })).rejects.toMatchObject({ code: "NOT_FOUND" });
       expect((await start(c, null, ch, { amount: 999999 })).amountCents).toBe(99_999_900);
-      expect((await start(c, null, ch, { amount: 1 })).amountCents).toBe(100);
+      expect((await start(c, null, ch, { amount: 5 })).amountCents).toBe(500);
     }));
 
   it("only works for active channels", () =>

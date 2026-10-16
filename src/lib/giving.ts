@@ -1,7 +1,7 @@
 // Client-safe giving constants and helpers.
 
 /** Limits in WHOLE currency units, as the support form works in whole dollars. */
-export const GIVING_LIMITS = { minAmount: 1, maxAmount: 999_999 } as const;
+export const GIVING_LIMITS = { minAmount: 5, maxAmount: 999_999 } as const;
 
 export const DONATION_SOURCES = ["web", "mobile", "social", "email", "offline", "other"] as const;
 

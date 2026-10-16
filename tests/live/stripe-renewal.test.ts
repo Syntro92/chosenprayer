@@ -95,7 +95,7 @@ afterAll(async () => {
   await pool.query("delete from public.subscriptions where channel_id = any($1)", [channelIds]);
   await pool.query("delete from public.channels where id = any($1)", [channelIds]);
   await pool.end();
-});
+}, 60_000);
 
 describe.skipIf(!live)("monthly renewals on Stripe test clocks", () => {
   it("renews every month on the same day, charges the saved card, records each payment, and flags a failed renewal", async () => {

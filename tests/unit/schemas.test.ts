@@ -106,3 +106,17 @@ describe("safeNext (open-redirect guard)", () => {
     expect(safeNext("https://x.y", "/")).toBe("/");
   });
 });
+
+describe("startDonationSchema minimum amount", () => {
+  const base = { channelHandle: "somechannel1", frequency: "once", idempotencyKey: "key-12345678" };
+  it.each([0, 1, 4])("rejects %i, below the 5 minimum", async (amount) => {
+    const { startDonationSchema } = await import("@/lib/schemas/giving");
+    const r = startDonationSchema.safeParse({ ...base, amount });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues[0].message).toBe("The minimum is 5");
+  });
+  it.each([5, 25, 999_999])("accepts %i", async (amount) => {
+    const { startDonationSchema } = await import("@/lib/schemas/giving");
+    expect(startDonationSchema.safeParse({ ...base, amount }).success).toBe(true);
+  });
+});

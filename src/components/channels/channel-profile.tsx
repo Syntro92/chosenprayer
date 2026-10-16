@@ -11,6 +11,7 @@ import {
   mockPayAction,
   startDonationAction,
 } from "@/actions/giving";
+import { GIVING_LIMITS } from "@/lib/giving";
 import type { GivingConfig } from "@/server/services/giving";
 import {
   formatDate,
@@ -103,7 +104,9 @@ export function SupportForm({
 }) {
   const amount = resolveAmount(value);
   const paused = config?.available === false;
-  const ready = amount >= 1 && !paused && amount <= (config?.maxAmount ?? 999_999);
+  const minAmount = config?.minAmount ?? GIVING_LIMITS.minAmount;
+  const ready = amount >= minAmount && !paused && amount <= (config?.maxAmount ?? GIVING_LIMITS.maxAmount);
+  const belowMin = value.amount === "custom" && value.custom !== "" && amount < minAmount;
   const set = (patch: Partial<Support>) => onChange({ ...value, ...patch });
 
   const chip = (selected: boolean) =>
@@ -200,6 +203,11 @@ export function SupportForm({
             className="w-full bg-transparent text-sm font-semibold text-charcoal-deep outline-none placeholder:font-normal placeholder:text-slate/70"
           />
         </label>
+      )}
+      {belowMin && (
+        <p role="alert" className="mt-2 text-xs font-medium text-red-600">
+          Minimum {money(minAmount)}
+        </p>
       )}
 
       <OriginButton
