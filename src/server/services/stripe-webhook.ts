@@ -2,9 +2,11 @@ import "server-only";
 import type Stripe from "stripe";
 import { AppError } from "../errors";
 import { log } from "../logger";
-import { mapStripeEvent } from "../providers/payments/stripe";
+import { donationLookupSchema } from "@/lib/schemas/giving";
+import type { Actor } from "../auth/policy";
+import { chargeDetailsOf, mapStripeEvent } from "../providers/payments/stripe";
 import { db, type Queryable } from "../db";
-import { handlePaymentEvent } from "./giving";
+import { handlePaymentEvent, loadAuthorizedDonation } from "./giving";
 
 export interface WebhookResult {
   handled: boolean;
@@ -38,4 +40,31 @@ export async function processStripeWebhook(
   const outcome = await handlePaymentEvent(mapped, "stripe", conn);
   if (outcome.ignored) log.info("stripe event matched nothing we know", { type: event.type, eventId: event.id });
   return { handled: !outcome.ignored, duplicate: outcome.duplicate, channelHandles: outcome.channelHandles };
+}
+
+/**
+ * Safety net for a webhook that is late or never arrives (e.g. `stripe listen` not running, or the
+ * endpoint not configured). If the donation is still pending, ask Stripe directly and, when the
+ * payment really succeeded, apply the same event the webhook would. Idempotent with the real
+ * webhook: whichever comes second finds the donation already settled and does nothing.
+ * Returns the channel handles whose cached pages need refreshing.
+ */
+export async function reconcileStripeDonation(actor: Actor | null, raw: unknown, stripe: Stripe, conn: Queryable = db): Promise<string[]> {
+  const { donationId, token } = donationLookupSchema.parse(raw);
+  const d = await loadAuthorizedDonation(actor, donationId, token, conn);
+  if (d.status !== "pending" || !d.provider_payment_id) return [];
+  const pi = await stripe.paymentIntents.retrieve(d.provider_payment_id);
+  if (pi.status !== "succeeded") return [];
+  const outcome = await handlePaymentEvent(
+    {
+      type: "payment.succeeded",
+      eventId: `reconcile:${pi.id}`,
+      providerPaymentId: pi.id,
+      ...(await chargeDetailsOf(stripe, pi.id, { attempts: 2, delayMs: 500 })),
+      providerCustomerId: typeof pi.customer === "string" ? pi.customer : pi.customer?.id,
+    },
+    "stripe",
+    conn,
+  );
+  return outcome.channelHandles;
 }

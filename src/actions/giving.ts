@@ -5,7 +5,10 @@ import { revalidateTag } from "next/cache";
 import { action } from "@/server/action";
 import { getActor } from "@/server/auth/session";
 import { ipFromHeaders } from "@/server/http";
+import { errorFields, log } from "@/server/logger";
+import { getPaymentsMode, getStripeClient } from "@/server/providers/payments";
 import { createBlessing } from "@/server/services/blessings";
+import { reconcileStripeDonation } from "@/server/services/stripe-webhook";
 import {
   cancelMySubscription,
   getDonationStatus,
@@ -41,7 +44,18 @@ export async function mockPayAction(input: unknown) {
 }
 
 export async function getDonationStatusAction(input: unknown) {
-  return action("getDonationStatus", async () => getDonationStatus(await getActor(), input));
+  return action("getDonationStatus", async () => {
+    const actor = await getActor();
+    // If Stripe's webhook hasn't landed yet, confirm with Stripe directly so the donor isn't left waiting.
+    if (getPaymentsMode().provider === "stripe") {
+      try {
+        refresh(await reconcileStripeDonation(actor, input, getStripeClient()));
+      } catch (e) {
+        log.warn("could not reconcile donation with Stripe; relying on the webhook", errorFields(e));
+      }
+    }
+    return getDonationStatus(actor, input);
+  });
 }
 
 export async function createBlessingAction(input: unknown) {
