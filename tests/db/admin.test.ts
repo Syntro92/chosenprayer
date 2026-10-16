@@ -51,10 +51,9 @@ async function donation(c: Queryable, channelId: string, over: { status?: string
 }
 
 describe("access control", () => {
-  it("every admin service rejects anonymous, members and (except reports) moderators", () =>
+  it("every admin service rejects anonymous and members", () =>
     withRollback(async (c) => {
       const m = await member(c);
-      const mod = await member(c, { role: "moderator" });
       const calls: ((actor: typeof m | null) => Promise<unknown>)[] = [
         (a) => listAdminChannels(a, {}, c),
         (a) => createAdminChannel(a, newChannel(), c),
@@ -69,7 +68,6 @@ describe("access control", () => {
       for (const call of calls) {
         await expect(call(null)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
         await expect(call(m)).rejects.toMatchObject({ code: "FORBIDDEN" });
-        await expect(call(mod)).rejects.toMatchObject({ code: "FORBIDDEN" });
       }
     }));
 
@@ -276,8 +274,8 @@ describe("admin users", () => {
       const u = await member(c);
       const auth = new FakeAuth();
 
-      let out = await updateAdminUser(a, u.userId, { role: "moderator", verified: true }, c, auth);
-      expect(out).toMatchObject({ role: "moderator", verified: true });
+      let out = await updateAdminUser(a, u.userId, { role: "admin", verified: true }, c, auth);
+      expect(out).toMatchObject({ role: "admin", verified: true });
 
       expect(await invalid(updateAdminUser(a, u.userId, { status: "suspended" }, c, auth))).toMatchObject({ code: "VALIDATION", fields: { reason: expect.any(String) } });
       out = await updateAdminUser(a, u.userId, { status: "suspended", reason: "Abuse" }, c, auth);
@@ -362,11 +360,9 @@ describe("admin create user", () => {
   it("is admin-only and validates input", () =>
     withRollback(async (c) => {
       const m = await member(c);
-      const mod = await member(c, { role: "moderator" });
       const a = await admin(c);
       await expect(createAdminUser(null, input(), c, provisioner(c))).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       await expect(createAdminUser(m, input(), c, provisioner(c))).rejects.toMatchObject({ code: "FORBIDDEN" });
-      await expect(createAdminUser(mod, input(), c, provisioner(c))).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect((await invalid(createAdminUser(a, input({ password: "short" }), c, provisioner(c)))).code).toBe("VALIDATION");
       expect((await invalid(createAdminUser(a, input({ email: "nope" }), c, provisioner(c)))).code).toBe("VALIDATION");
       expect((await invalid(createAdminUser(a, input({ role: "owner" }), c, provisioner(c)))).code).toBe("VALIDATION");
@@ -525,9 +521,9 @@ describe("resolveReport", () => {
     return { postId: post.id, reportId: rep.id };
   }
 
-  it("a moderator can dismiss or remove; removal needs a reason", () =>
+  it("an admin can dismiss or remove; removal needs a reason", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const one = await reported(c);
       expect(await resolveReport(mod, one.reportId, { action: "dismiss", note: "Looks fine" }, c)).toEqual({ action: "dismiss" });
       expect((await c.query("select status, resolution from public.reports where id = $1", [one.reportId])).rows[0]).toMatchObject({ status: "dismissed", resolution: "Looks fine" });
@@ -542,7 +538,7 @@ describe("resolveReport", () => {
   it("rejects members, unknown reports and unknown actions", () =>
     withRollback(async (c) => {
       const m = await member(c);
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const r = await reported(c);
       await expect(resolveReport(m, r.reportId, { action: "dismiss" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(resolveReport(null, r.reportId, { action: "dismiss" }, c)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });

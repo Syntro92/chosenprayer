@@ -1,11 +1,8 @@
 /**
- * Makes someone an admin or moderator (creating the account if needed).
+ * Makes someone an admin (creating the account if needed).
  *
  *   npm run admin:create -- you@example.com
  *       promotes an EXISTING account to admin
- *
- *   npm run admin:create -- you@example.com --role moderator
- *       gives an existing account moderator tools instead (--role member removes them)
  *
  *   ADMIN_NEW_PASSWORD='a-strong-password' npm run admin:create -- you@example.com --name "Your Name"
  *       creates a confirmed account with that password (if none exists) and makes it admin
@@ -24,8 +21,8 @@ const roleFlag = args.indexOf("--role");
 const role = roleFlag >= 0 ? args[roleFlag + 1] : "admin";
 const password = process.env.ADMIN_NEW_PASSWORD;
 
-if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !["admin", "moderator", "member"].includes(role)) {
-  console.error("Usage: npm run admin:create -- <email> [--role admin|moderator|member] [--name \"Full Name\"]   (set ADMIN_NEW_PASSWORD to create a new account)");
+if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !["admin", "member"].includes(role)) {
+  console.error("Usage: npm run admin:create -- <email> [--role admin|member] [--name \"Full Name\"]   (set ADMIN_NEW_PASSWORD to create a new account)");
   process.exit(1);
 }
 for (const k of ["DATABASE_URL", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {

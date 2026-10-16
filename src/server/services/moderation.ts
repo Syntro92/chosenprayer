@@ -17,7 +17,7 @@ const reasonSchema = z.object({
 });
 
 const notFound = (what: string) => new AppError("NOT_FOUND", `${what} not found.`);
-const denied = () => new AppError("FORBIDDEN", "You can't moderate content from a moderator or admin.");
+const denied = () => new AppError("FORBIDDEN", "You can't moderate content from an admin.");
 
 /* ------------------------------------------------------------------------ */
 /* Removing content                                                          */
@@ -33,11 +33,11 @@ interface Target {
 /**
  * Soft-removes a post (hidden from everyone, kept as evidence), closes its open reports
  * as "actioned", tells the author why, and writes the audit trail, all atomically.
- * Moderators act on members; admins on members and moderators. To remove your own post,
+ * Admins act on members. To remove your own post,
  * delete it normally.
  */
 export async function removePost(actor: Actor | null, rawId: string, raw: unknown, conn: Queryable = db): Promise<void> {
-  const a = requireRole(actor, "moderator");
+  const a = requireRole(actor, "admin");
   const id = uuidSchema.safeParse(rawId);
   if (!id.success) throw notFound("Post");
   const { reason } = reasonSchema.parse(raw);
@@ -67,7 +67,7 @@ export async function removePost(actor: Actor | null, rawId: string, raw: unknow
       userId: t.author_id,
       actorId: a.userId,
       type: "moderation",
-      text: `A moderator removed your post: ${reason}`,
+      text: `An admin removed your post: ${reason}`,
       href: "/community",
     });
     await audit(c, {
@@ -124,7 +124,7 @@ export async function pinPost(actor: Actor | null, rawId: string, raw: unknown, 
 
 /** Same as removePost, for a comment. Its replies are removed with it. */
 export async function removeComment(actor: Actor | null, rawId: string, raw: unknown, conn: Queryable = db): Promise<void> {
-  const a = requireRole(actor, "moderator");
+  const a = requireRole(actor, "admin");
   const id = uuidSchema.safeParse(rawId);
   if (!id.success) throw notFound("Comment");
   const { reason } = reasonSchema.parse(raw);
@@ -155,7 +155,7 @@ export async function removeComment(actor: Actor | null, rawId: string, raw: unk
       userId: t.author_id,
       actorId: a.userId,
       type: "moderation",
-      text: `A moderator removed your comment: ${reason}`,
+      text: `An admin removed your comment: ${reason}`,
       href: `/community/posts/${t.post_id}`,
     });
     await audit(c, {
@@ -232,11 +232,11 @@ interface ReportRow {
 }
 
 /**
- * The moderator queue. "open" lists oldest first (work through them in order);
+ * The report queue. "open" lists oldest first (work through them in order);
  * "handled" lists most recently handled first.
  */
 export async function listReports(actor: Actor | null, raw: unknown = {}, conn: Queryable = db) {
-  requireRole(actor, "moderator");
+  requireRole(actor, "admin");
   const q = reportsQuerySchema.parse(raw);
   const limit = clampLimit(q.limit, 20, 50);
   const cursor = decodeCursor(q.cursor);
@@ -315,7 +315,7 @@ export async function listReports(actor: Actor | null, raw: unknown = {}, conn: 
 }
 
 export async function countOpenReports(actor: Actor | null, conn: Queryable = db): Promise<number> {
-  requireRole(actor, "moderator");
+  requireRole(actor, "admin");
   return (await one<{ n: number }>("select count(*) as n from public.reports where status = 'open'", [], conn))?.n ?? 0;
 }
 
@@ -324,7 +324,7 @@ export async function countOpenReports(actor: Actor | null, conn: Queryable = db
  * post/comment as dismissed (one decision per piece of content, not per reporter).
  */
 export async function dismissReport(actor: Actor | null, rawId: string, raw: unknown = {}, conn: Queryable = db): Promise<{ closed: number }> {
-  const a = requireRole(actor, "moderator");
+  const a = requireRole(actor, "admin");
   const id = uuidSchema.safeParse(rawId);
   if (!id.success) throw notFound("Report");
   const { resolution } = z.object({ resolution: z.string().trim().max(300).default("") }).parse(raw);
@@ -425,7 +425,7 @@ export async function unsuspendUser(
 /** Promote or demote a member. You can't change your own role (so the last admin can't lock everyone out). */
 export async function setRole(actor: Actor | null, userId: string, raw: unknown, conn: Queryable = db): Promise<void> {
   const a = requireRole(actor, "admin");
-  const { role } = z.object({ role: z.enum(["member", "moderator", "admin"]) }).parse(raw);
+  const { role } = z.object({ role: z.enum(["member", "admin"]) }).parse(raw);
 
   await inTransaction(conn, async (c) => {
     const u = await loadUser(userId, c);

@@ -1,6 +1,6 @@
 /** Shapes shared by the community UI and the server (what the Server Actions return). */
 
-export type Role = "visitor" | "member" | "moderator";
+export type Role = "visitor" | "member";
 
 export interface Member {
   id: string;

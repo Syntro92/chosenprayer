@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import { loadMemberPostsAction } from "@/actions/community";
-import { setRoleAction, suspendUserAction, unsuspendUserAction } from "@/actions/moderation";
+import { suspendUserAction, unsuspendUserAction } from "@/actions/moderation";
 import type { Member } from "@/lib/community/types";
 import { useCommunity } from "./community-provider";
 import { PostCard } from "./post-card";
@@ -19,15 +19,14 @@ import { Avatar, EmptyState, focus, secondaryBtn } from "./ui";
  */
 export interface AdminView {
   status: "active" | "suspended";
-  role: "member" | "moderator" | "admin";
+  role: "member" | "admin";
 }
 
-/** Admin-only tools shown on a member's profile: suspend / unsuspend and change role. */
+/** Admin-only tools shown on a member's profile: suspend / unsuspend. */
 function AdminTools({ member, admin }: { member: Member; admin: AdminView }) {
   const router = useRouter();
   const { toast } = useCommunity();
-  const [dialog, setDialog] = useState<null | "suspend" | "unsuspend" | "role">(null);
-  const [role, setRole] = useState<"member" | "moderator">(admin.role === "moderator" ? "moderator" : "member");
+  const [dialog, setDialog] = useState<null | "suspend" | "unsuspend">(null);
   const suspended = admin.status === "suspended";
 
   async function run(r: { ok: boolean; error?: { message: string } }, success: string) {
@@ -59,18 +58,6 @@ function AdminTools({ member, admin }: { member: Member; admin: AdminView }) {
             Suspend member
           </button>
         )}
-        <label className="flex items-center gap-2 text-sm text-slate">
-          Role
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as "member" | "moderator")}
-            className={`h-10 rounded-xl border border-line bg-white px-3 text-sm text-charcoal-deep ${focus}`}
-          >
-            <option value="member">Member</option>
-            <option value="moderator">Moderator</option>
-          </select>
-        </label>
-        <button type="button" disabled={role === admin.role} onClick={() => setDialog("role")} className={`${secondaryBtn} h-10`}>Change role</button>
       </div>
 
       <ReasonDialog
@@ -90,17 +77,6 @@ function AdminTools({ member, admin }: { member: Member; admin: AdminView }) {
         onClose={() => setDialog(null)}
         onConfirm={async () => {
           await run(await unsuspendUserAction(member.id), `${member.name} was unsuspended.`);
-          setDialog(null);
-        }}
-      />
-      <ConfirmDialog
-        open={dialog === "role"}
-        title={`Make ${member.name} a ${role}?`}
-        text={role === "moderator" ? "Moderators can remove posts and comments and work the report queue." : "They will lose moderator tools."}
-        confirmLabel="Change role"
-        onClose={() => setDialog(null)}
-        onConfirm={async () => {
-          await run(await setRoleAction(member.id, { role }), `${member.name} is now a ${role}.`);
           setDialog(null);
         }}
       />

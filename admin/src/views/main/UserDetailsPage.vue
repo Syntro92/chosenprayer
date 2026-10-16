@@ -14,7 +14,7 @@ interface User {
   username: string;
   email: string | null;
   bio: string;
-  role: 'member' | 'moderator' | 'admin';
+  role: 'member' | 'admin';
   status: 'active' | 'suspended';
   verified: boolean;
   joinedAt: string;
@@ -107,7 +107,7 @@ const describe = (h: User['history'][number]) => {
       <UiParentCard title="Manage account">
         <v-alert v-if="actionError" type="error" variant="tonal" class="mb-4">{{ actionError }}</v-alert>
         <div class="d-flex align-center ga-3 mb-2">
-          <v-select v-model="role" :items="['member', 'moderator', 'admin']" label="Role" density="comfortable" hide-details :disabled="isMe()" style="max-width: 220px" />
+          <v-select v-model="role" :items="['member', 'admin']" label="Role" density="comfortable" hide-details :disabled="isMe()" style="max-width: 220px" />
           <v-btn color="primary" variant="flat" :disabled="role === user.role || isMe()" :loading="savingRole" @click="saveRole">Save role</v-btn>
         </div>
         <div v-if="isMe()" class="text-caption text-disabled mb-2">You can’t change your own role or suspend yourself.</div>

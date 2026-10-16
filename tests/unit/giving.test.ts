@@ -151,6 +151,6 @@ describe("account emails", () => {
     }
   });
   it("welcome email links to sign-in", () => {
-    expect(renderEmail("account_created", { name: "Sam", role: "moderator", loginUrl: "https://x.test/signin" }).html).toContain('href="https://x.test/signin"');
+    expect(renderEmail("account_created", { name: "Sam", role: "admin", loginUrl: "https://x.test/signin" }).html).toContain('href="https://x.test/signin"');
   });
 });

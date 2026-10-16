@@ -9,5 +9,5 @@ const query = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-/** Moderators can work the queue too. */
-export const GET = adminRoute(async (req, { actor }) => json(await listReports(actor, parseQuery(req, query))), "moderator");
+/** Admins work the report queue. */
+export const GET = adminRoute(async (req, { actor }) => json(await listReports(actor, parseQuery(req, query))), "admin");

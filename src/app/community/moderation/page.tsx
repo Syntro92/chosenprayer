@@ -16,8 +16,8 @@ export const metadata: Metadata = {
 async function Queue() {
   const actor = await getActor();
   if (!actor || actor.status !== "active") return <MembersGate next="/community/moderation" />;
-  // Don't reveal that this page exists to people who aren't moderators.
-  if (!hasRole(actor, "moderator")) notFound();
+  // Don't reveal that this page exists to people who aren't admins.
+  if (!hasRole(actor, "admin")) notFound();
   const initial = await listReports(actor, { status: "open" });
   return <ModerationQueue initial={initial} />;
 }

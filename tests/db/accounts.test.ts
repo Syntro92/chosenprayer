@@ -323,7 +323,7 @@ describe("getPublicMember", () => {
 
   it("flags staff, hides suspended members, 404s unknown names", async () => {
     const viewer = await makeUser();
-    const staff = await makeUser({ role: "moderator" });
+    const staff = await makeUser({ role: "admin" });
     const gone = await makeUser();
     const actor = await actorOf(viewer.id);
     expect((await accounts.getPublicMember(actor, (await actorOf(staff.id)).username)).isStaff).toBe(true);

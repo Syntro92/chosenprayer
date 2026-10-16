@@ -27,7 +27,7 @@ async function Content({ params }: { params: Promise<{ username: string }> }) {
   }
   const [viewer, page] = data;
   return (
-    <CommunityProvider session={{ user: viewer, isModerator: hasRole(actor, "moderator"), isAdmin: hasRole(actor, "admin") }} initial={{ posts: page.posts, members: page.members }}>
+    <CommunityProvider session={{ user: viewer, isModerator: hasRole(actor, "admin"), isAdmin: hasRole(actor, "admin") }} initial={{ posts: page.posts, members: page.members }}>
       <MemberProfile
         member={page.member}
         initialCursor={page.nextCursor}

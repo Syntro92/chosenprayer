@@ -13,7 +13,7 @@ const optional = <T extends z.ZodTypeAny>(s: T) => z.preprocess((v) => (v === ""
 export const CHANNEL_STATUSES = ["pending", "active", "paused", "archived"] as const;
 export const DONATION_STATUSES = ["pending", "succeeded", "failed", "refunded", "canceled"] as const;
 export const DONATION_SOURCES = ["web", "mobile", "social", "email", "offline", "other"] as const;
-export const ROLES = ["member", "moderator", "admin"] as const;
+export const ROLES = ["member", "admin"] as const;
 export const ACCOUNT_STATUSES = ["active", "suspended"] as const;
 
 export const adminChannelListSchema = z.object({

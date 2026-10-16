@@ -6,7 +6,7 @@ export interface AdminMe {
   id: string;
   name: string;
   username: string;
-  role: 'moderator' | 'admin';
+  role: 'admin';
   /** Signed in with an admin-issued temporary password: only the change-password page is allowed. */
   mustChangePassword: boolean;
 }

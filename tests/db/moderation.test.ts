@@ -46,13 +46,9 @@ class FakeAuth implements AuthAdmin {
 }
 
 describe("canModerateRole", () => {
-  it("admins act on members and moderators; moderators on members; nobody on admins", () => {
+  it("admins act on members; nobody on admins", () => {
     expect(canModerateRole("admin", "member")).toBe(true);
-    expect(canModerateRole("admin", "moderator")).toBe(true);
     expect(canModerateRole("admin", "admin")).toBe(false);
-    expect(canModerateRole("moderator", "member")).toBe(true);
-    expect(canModerateRole("moderator", "moderator")).toBe(false);
-    expect(canModerateRole("moderator", "admin")).toBe(false);
     expect(canModerateRole("member", "member")).toBe(false);
   });
 });
@@ -61,7 +57,7 @@ describe("canModerateRole", () => {
 describe("removePost", () => {
   it("hides the post, records who/when/why, closes its reports, notifies the author and writes the audit log", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator", name: "Mod" });
+      const mod = await member(c, { role: "admin", name: "Mod" });
       const author = await member(c);
       const reporter = await member(c);
       const other = await member(c);
@@ -77,14 +73,14 @@ describe("removePost", () => {
       // gone for everyone
       await expect(getPost(author, post, c, store())).rejects.toMatchObject({ code: "NOT_FOUND" });
       expect((await listFeed(other, { q: "something rude" }, c, store())).posts).toEqual([]);
-      // both reports closed as actioned by the moderator
+      // both reports closed as actioned by the admin
       const reports = (await c.query("select status, handled_by, resolution from public.reports where post_id = $1", [post])).rows;
       expect(reports).toHaveLength(2);
       for (const r of reports) expect(r).toMatchObject({ status: "actioned", handled_by: mod.userId, resolution: "Post removed: Harassment" });
       void r1;
       // the author is told why
       const n = await listNotifications(author, {}, c);
-      expect(n.items.map((x) => x.text)).toContain("A moderator removed your post: Harassment");
+      expect(n.items.map((x) => x.text)).toContain("An admin removed your post: Harassment");
       // audit trail
       const log = (await c.query("select action, entity_type, entity_id, actor_id, metadata from public.audit_log where entity_id = $1", [post])).rows;
       expect(log).toHaveLength(1);
@@ -94,7 +90,7 @@ describe("removePost", () => {
 
   it("can't be repeated, and unknown ids 404", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c);
       const post = await rawPost(c, author.userId);
       await removePost(mod, post, { reason: "spam" }, c);
@@ -105,7 +101,7 @@ describe("removePost", () => {
 
   it("requires a reason (1-300 chars)", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const post = await rawPost(c, (await member(c)).userId);
       for (const reason of ["", "   ", "x".repeat(301)]) {
         await expect(removePost(mod, post, { reason }, c)).rejects.toMatchObject({ name: "ZodError" });
@@ -113,34 +109,28 @@ describe("removePost", () => {
       await expect(removePost(mod, post, {}, c)).rejects.toMatchObject({ name: "ZodError" });
     }));
 
-  it("is for moderators and admins only", () =>
+  it("is for admins only", () =>
     withRollback(async (c) => {
       const author = await member(c);
       const post = await rawPost(c, author.userId);
       await expect(removePost(null, post, { reason: "x" }, c)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       await expect(removePost(await member(c), post, { reason: "x" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
-      await expect(removePost(await member(c, { role: "moderator", status: "suspended" }), post, { reason: "x" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(removePost(await member(c, { role: "admin", status: "suspended" }), post, { reason: "x" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect((await c.query("select status from public.posts where id = $1", [post])).rows[0].status).toBe("visible");
     }));
 
-  it("respects the hierarchy: moderators can't touch staff; admins can't touch admins", () =>
+  it("respects the hierarchy: admins can't touch admins", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
-      const mod2 = await member(c, { role: "moderator" });
       const admin = await member(c, { role: "admin" });
       const admin2 = await member(c, { role: "admin" });
-      const byMod2 = await rawPost(c, mod2.userId);
       const byAdmin = await rawPost(c, admin.userId);
-      await expect(removePost(mod, byMod2, { reason: "x" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
-      await expect(removePost(mod, byAdmin, { reason: "x" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(removePost(admin2, byAdmin, { reason: "x" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
-      await removePost(admin2, byMod2, { reason: "x" }, c); // admin over moderator is fine
       expect((await c.query("select status from public.posts where id = $1", [byAdmin])).rows[0].status).toBe("visible");
     }));
 
   it("sends you to 'delete' for your own post", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const mine = await rawPost(c, mod.userId);
       await expect(removePost(mod, mine, { reason: "x" }, c)).rejects.toMatchObject({ code: "VALIDATION" });
     }));
@@ -149,7 +139,7 @@ describe("removePost", () => {
 describe("removeComment", () => {
   it("removes the comment and its replies, fixes the count, closes reports, notifies and audits", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c);
       const replier = await member(c);
       const reporter = await member(c);
@@ -175,15 +165,15 @@ describe("removeComment", () => {
       }
       const n = (await listNotifications(author, {}, c)).items;
       // (notifications created in one test transaction share a timestamp, so match by content, not position)
-      expect(n.find((x) => x.text === "A moderator removed your comment: Rude")).toMatchObject({ href: `/community/posts/${post}` });
+      expect(n.find((x) => x.text === "An admin removed your comment: Rude")).toMatchObject({ href: `/community/posts/${post}` });
       const log = (await c.query("select metadata from public.audit_log where entity_id = $1 and action = 'comment.remove'", [top.id])).rows;
       expect(log[0].metadata).toMatchObject({ removedComments: 2, closedReports: 2, postId: post });
     }));
 
   it("enforces roles, hierarchy, reasons and existence", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
-      const staff = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
+      const staff = await member(c, { role: "admin" });
       const plain = await member(c);
       const post = await rawPost(c, plain.userId);
       const byStaff = (await addComment(staff, { postId: post, text: "staff words" }, c)).comment;
@@ -203,7 +193,7 @@ describe("removeComment", () => {
 describe("listReports / countOpenReports", () => {
   it("lists open reports oldest first with the content, people and a per-content count", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c, { name: "Offender" });
       const a = await member(c, { name: "Reporter A" });
       const b = await member(c, { name: "Reporter B" });
@@ -234,7 +224,7 @@ describe("listReports / countOpenReports", () => {
 
   it("shows comment reports with the comment text and its post", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c);
       const post = await rawPost(c, author.userId);
       const cm = (await addComment(author, { postId: post, text: "reported comment" }, c)).comment;
@@ -245,7 +235,7 @@ describe("listReports / countOpenReports", () => {
 
   it("'handled' lists closed reports, newest handled first, with who handled them", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator", name: "Handler" });
+      const mod = await member(c, { role: "admin", name: "Handler" });
       const author = await member(c);
       const rep = await member(c);
       const p1 = await rawPost(c, author.userId, "first");
@@ -265,7 +255,7 @@ describe("listReports / countOpenReports", () => {
 
   it("pages through the queue without skipping or repeating", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c);
       const rep = await member(c);
       const ids: string[] = [];
@@ -287,9 +277,9 @@ describe("listReports / countOpenReports", () => {
       expect(new Set(walked).size).toBe(5);
     }));
 
-  it("rejects bad cursors and non-moderators", () =>
+  it("rejects bad cursors and non-admins", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       await expect(listReports(mod, { cursor: "garbage" }, c)).rejects.toMatchObject({ code: "VALIDATION" });
       await expect(listReports(await member(c), {}, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(listReports(null, {}, c)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
@@ -300,7 +290,7 @@ describe("listReports / countOpenReports", () => {
 describe("dismissReport", () => {
   it("closes every open report on that content, leaves other content alone, and audits", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c);
       const [a, b] = [await member(c), await member(c)];
       const p1 = await rawPost(c, author.userId);
@@ -322,7 +312,7 @@ describe("dismissReport", () => {
 
   it("can't be done twice, on unknown reports, or by members", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c);
       const r = await report(c, (await member(c)).userId, { post: await rawPost(c, author.userId) });
       await expect(dismissReport(await member(c), r, {}, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -374,13 +364,13 @@ describe("suspend / unsuspend / setRole (admins only)", () => {
       expect(auth.calls).toEqual([]);
     }));
 
-  it("moderators and members can't suspend or change roles", () =>
+  it("members can't suspend or change roles", () =>
     withRollback(async (c) => {
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c);
       const target = await member(c);
       await expect(suspendUser(mod, target.userId, { reason: "x" }, c, new FakeAuth())).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(unsuspendUser(mod, target.userId, c, new FakeAuth())).rejects.toMatchObject({ code: "FORBIDDEN" });
-      await expect(setRole(mod, target.userId, { role: "moderator" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(setRole(mod, target.userId, { role: "admin" }, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(suspendUser(null, target.userId, { reason: "x" }, c, new FakeAuth())).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
     }));
 
@@ -388,12 +378,12 @@ describe("suspend / unsuspend / setRole (admins only)", () => {
     withRollback(async (c) => {
       const admin = await member(c, { role: "admin" });
       const target = await member(c);
-      await setRole(admin, target.userId, { role: "moderator" }, c);
-      expect((await c.query("select role from public.profiles where id = $1", [target.userId])).rows[0].role).toBe("moderator");
-      await setRole(admin, target.userId, { role: "moderator" }, c); // no-op
+      await setRole(admin, target.userId, { role: "admin" }, c);
+      expect((await c.query("select role from public.profiles where id = $1", [target.userId])).rows[0].role).toBe("admin");
+      await setRole(admin, target.userId, { role: "admin" }, c); // no-op
       await setRole(admin, target.userId, { role: "member" }, c);
       const log = (await c.query("select metadata from public.audit_log where action = 'user.set_role' and entity_id = $1 order by id", [target.userId])).rows;
-      expect(log.map((l) => [l.metadata.from, l.metadata.to])).toEqual([["member", "moderator"], ["moderator", "member"]]);
+      expect(log.map((l) => [l.metadata.from, l.metadata.to])).toEqual([["member", "admin"], ["admin", "member"]]);
       await expect(setRole(admin, admin.userId, { role: "member" }, c)).rejects.toMatchObject({ code: "VALIDATION" });
       await expect(setRole(admin, target.userId, { role: "owner" }, c)).rejects.toMatchObject({ name: "ZodError" });
       await expect(setRole(admin, randomUUID(), { role: "member" }, c)).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -404,13 +394,13 @@ describe("listAuditLog", () => {
   it("is admin-only, newest first, filterable and paginated", () =>
     withRollback(async (c) => {
       const admin = await member(c, { role: "admin", name: "The Admin" });
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const author = await member(c);
       const p1 = await rawPost(c, author.userId, "one");
       const p2 = await rawPost(c, author.userId, "two");
       await removePost(mod, p1, { reason: "r1" }, c);
       await removePost(mod, p2, { reason: "r2" }, c);
-      await setRole(admin, author.userId, { role: "moderator" }, c);
+      await setRole(admin, author.userId, { role: "admin" }, c);
 
       const all = await listAuditLog(admin, { limit: 50 }, c);
       const mine = all.items.filter((i) => [p1, p2, author.userId].includes(i.entityId ?? ""));
@@ -467,7 +457,7 @@ describe("pinPost", () => {
   it("is admin-only, validates input, ignores no-ops and caps at three", () =>
     withRollback(async (c) => {
       const admin = await member(c, { role: "admin" });
-      const mod = await member(c, { role: "moderator" });
+      const mod = await member(c, { role: "admin" });
       const m = await member(c);
       const post = await rawPost(c, m.userId);
       await expect(pinPost(null, post, { pinned: true }, c)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });

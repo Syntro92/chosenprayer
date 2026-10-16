@@ -8,7 +8,7 @@ import type { Storage } from "@/server/storage";
 /** Creates a member (auth user + auto-created profile) inside the caller's transaction. */
 export async function member(
   c: Queryable,
-  opts: { status?: "active" | "suspended"; role?: "member" | "moderator" | "admin"; name?: string } = {},
+  opts: { status?: "active" | "suspended"; role?: "member" | "admin"; name?: string } = {},
 ): Promise<Actor> {
   const id = randomUUID();
   await c.query("insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)", [

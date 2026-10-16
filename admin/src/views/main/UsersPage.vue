@@ -46,7 +46,7 @@ const opts = (values: string[], all: string) => [{ title: all, value: '' }, ...v
     <template #filters>
       <v-row dense>
         <v-col cols="12" md="5"><v-text-field v-model="filters.q" label="Search name, username or email" density="comfortable" hide-details clearable variant="outlined" /></v-col>
-        <v-col cols="6" md="3"><v-select v-model="filters.role" :items="opts(['member', 'moderator', 'admin'], 'All roles')" label="Role" density="comfortable" hide-details variant="outlined" /></v-col>
+        <v-col cols="6" md="3"><v-select v-model="filters.role" :items="opts(['member', 'admin'], 'All roles')" label="Role" density="comfortable" hide-details variant="outlined" /></v-col>
         <v-col cols="6" md="3"><v-select v-model="filters.status" :items="opts(['active', 'suspended'], 'All statuses')" label="Status" density="comfortable" hide-details variant="outlined" /></v-col>
       </v-row>
     </template>

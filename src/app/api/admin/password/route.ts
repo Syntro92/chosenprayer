@@ -18,6 +18,6 @@ export const PUT = adminRoute(
     await accounts.updatePassword(ctx, actor, { password: v.password });
     return json({ ok: true });
   },
-  "moderator",
+  "admin",
   { allowTempPassword: true },
 );

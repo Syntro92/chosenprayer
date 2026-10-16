@@ -58,5 +58,5 @@ async function submit(e: Event) {
     <v-btn color="secondary" :loading="loading" block class="mt-6" variant="flat" size="large" rounded="0" type="submit">Sign In</v-btn>
     <v-alert v-if="error" type="error" variant="tonal" class="mt-4" role="alert">{{ error }}</v-alert>
   </v-form>
-  <div class="mt-6 text-center text-caption text-disabled">Admins and moderators only. Use the same email and password as on the website.</div>
+  <div class="mt-6 text-center text-caption text-disabled">Admins only. Use the same email and password as on the website.</div>
 </template>

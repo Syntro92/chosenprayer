@@ -60,7 +60,7 @@ const target = (e: Entry) => (typeof e.metadata.handle === 'string' ? `@${e.meta
 
 <template>
   <BaseBreadcrumb title="Audit Log" :breadcrumbs="[{ title: 'Main', disabled: false, href: '#' }, { title: 'Audit Log', disabled: true, href: '#' }]" />
-  <UiParentCard title="Admin and moderator actions">
+  <UiParentCard title="Admin actions">
     <v-select v-model="type" :items="[{ title: 'Everything', value: '' }, ...types.map((t) => ({ title: t, value: t }))]" label="Type" density="comfortable" hide-details variant="outlined" style="max-width: 240px" class="mb-4" />
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">{{ error }}</v-alert>
     <v-data-table :headers="headers" :items="items" :loading="loading" :items-per-page="-1" hide-default-footer no-data-text="No entries.">

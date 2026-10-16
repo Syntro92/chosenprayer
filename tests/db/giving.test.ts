@@ -516,7 +516,7 @@ describe("adminRefund", () => {
       const done = await paid(c, null, ch, {}, prov);
       const pending = await start(c, null, ch, {}, prov);
 
-      await expect(adminRefund(await member(c, { role: "moderator" }), done.donationId, { reason: "x" }, c, prov)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(adminRefund(await member(c), done.donationId, { reason: "x" }, c, prov)).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(adminRefund(null, done.donationId, { reason: "x" }, c, prov)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       await expect(adminRefund(admin, done.donationId, { reason: "" }, c, prov)).rejects.toMatchObject({ name: "ZodError" });
       await expect(adminRefund(admin, pending.donationId, { reason: "x" }, c, prov)).rejects.toMatchObject({ code: "CONFLICT" });

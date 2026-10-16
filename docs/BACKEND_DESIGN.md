@@ -18,7 +18,7 @@ How we build the whole backend on top of the Supabase schema that is already liv
 | Channels | Public directory + profile, owner-managed content, follow/unfollow |
 | Giving | One-time + monthly support, receipts, blessings (thank-you messages), refunds |
 | Community | Members-only feed: posts, comments, replies, likes, attachments |
-| Trust & safety | Reports, moderator removals, suspensions, audit trail |
+| Trust & safety | Reports, admin removals, suspensions, audit trail |
 | Notifications | In-app bell + email |
 | Admin | Everything the admin panel needs: dashboard, channels, transactions, users, settings, analytics |
 | Platform | Rate limiting, caching, analytics beacon, health checks, cron jobs |
@@ -145,7 +145,6 @@ A tiny policy module, used by services only:
 | anonymous | read active channels/profiles/content, masked blessings; donate (guest); send analytics beacon |
 | member | everything above + community read/write, follow, own profile, own donations/subscriptions, report |
 | channel owner (member with `channels.owner_id`) | edit *their* channel, content, links; see its aggregate stats |
-| moderator | member + remove posts/comments/blessings, handle reports |
 | admin | everything, incl. users/roles, channels approval, settings, flags, refunds, audit log |
 
 Ownership checks are explicit (`channel.owner_id === actor.userId`), never inferred from the request body.
@@ -230,12 +229,12 @@ Only a verified provider event (or the mock endpoint) moves a donation out of `p
 ### 6.6 Blessings 🔨 (needs a succeeded donation — works with mock)
 - `createBlessing({ donationId, token|actor, message (1–500), displayName?, anonymous, showAmount })`.
 - Rules: donation must be `succeeded` (DB trigger also enforces), belong to the caller (session `donor_id` or `public_token`), one per donation (unique), blessing channel must match donation (composite FK).
-- Public feed = `channel_blessings_public` view (names masked, amount only if opted in). Moderators can set a blessing `removed`.
+- Public feed = `channel_blessings_public` view (names masked, amount only if opted in). Admins can set a blessing `removed`.
 - Side-effects: `blessing_count` (trigger), notify channel owner, revalidate `channel:<handle>`.
 
 ### 6.7 Community 🔨
 **Posts** — `createPost({ body, attachments[] })`, `editPost`, `deletePost`, `listFeed(cursor)`, `getPost(id)`, `listMemberPosts(username)`.
-- Body ≤ 1000; require body **or** ≥1 attachment (app rule; DB allows empty body). Author edits only their own (`edited_at` is stamped by trigger). Authors hard-delete; moderators *remove* (soft).
+- Body ≤ 1000; require body **or** ≥1 attachment (app rule; DB allows empty body). Author edits only their own (`edited_at` is stamped by trigger). Authors hard-delete; admins *remove* (soft).
 - Feed returns, per post: author summary, attachments with **short-lived signed URLs**, counts (from the denormalised columns), and `likedByMe` (one query for the page's ids — no N+1).
 
 **Comments** — `addComment({ postId, body, parentId? })`, `editComment`, `deleteComment`, `listComments(postId)`. Body 1–500, replies one level deep (trigger), the post must be visible. Deleting a comment removes its replies (FK cascade).
@@ -252,7 +251,7 @@ Only a verified provider event (or the mock endpoint) moves a donation out of `p
 
 ### 6.8 Reports & moderation 🔨
 - Member: `reportPost / reportComment({ target, reason, note ≤ 300 })` — one open report per user per target (unique index).
-- Moderator: `listReports(status)`, `removePost/removeComment({ reason })` → sets `status='removed'`, `removed_by/at/reason`, closes related reports as `actioned`, notifies the author (`moderation`), writes `audit_log`. `dismissReport`.
+- Admin: `listReports(status)`, `removePost/removeComment({ reason })` → sets `status='removed'`, `removed_by/at/reason`, closes related reports as `actioned`, notifies the author (`moderation`), writes `audit_log`. `dismissReport`.
 - Admin: `suspendUser / unsuspendUser`, `setRole`. Role changes and suspensions always write `audit_log`.
 
 ### 6.9 Notifications 🔨
@@ -266,7 +265,7 @@ Only a verified provider event (or the mock endpoint) moves a donation out of `p
 - Templates: donation receipt, subscription started/failed/canceled, channel approved/rejected, moderation notice. (Auth emails — verify, reset — are sent by Supabase.)
 
 ### 6.11 Admin API ✅ (powers the Vue panel)
-Replaces `admin/src/utils/helpers/fake-backend.ts` and the sample arrays in `admin/src/views/main/data.ts`. Same-origin, cookie session, every handler starts with `requireRole('admin')` (or `moderator` where noted) + origin check on non-GET.
+Replaces `admin/src/utils/helpers/fake-backend.ts` and the sample arrays in `admin/src/views/main/data.ts`. Same-origin, cookie session, every handler starts with `requireRole('admin')` + origin check on non-GET.
 
 | Admin page | Endpoint(s) | Notes |
 |---|---|---|
@@ -279,7 +278,7 @@ Replaces `admin/src/utils/helpers/fake-backend.ts` and the sample arrays in `adm
 | Analytics | `GET /api/admin/analytics?range=` | aggregates over `page_views` + donations |
 | Live visitors | `GET /api/admin/live` | `count(distinct visitor_id)` in last 5 min, top paths |
 | Site health | `GET /api/admin/health` | DB ping, pending webhooks/emails backlog, last cron run |
-| Moderation | `GET /api/admin/reports`, `POST …/:id/resolve` | moderators allowed |
+| Moderation | `GET /api/admin/reports`, `POST …/:id/resolve` | admin |
 | Audit log | `GET /api/admin/audit` | read-only |
 
 The admin password in `.env.local` (`ADMIN_EMAIL/ADMIN_PASSWORD/ADMIN_SESSION_SECRET`) is currently unused by any code. Plan: **admins are normal accounts with `role='admin'`**; `npm run admin:create -- <email>` promotes (or creates) the first one, then those env vars are deleted.
@@ -306,7 +305,7 @@ The admin password in `.env.local` (`ADMIN_EMAIL/ADMIN_PASSWORD/ADMIN_SESSION_SE
 | `POST /api/webhooks/stripe` | Stripe signature | ✅ payment events (raw body) |
 | `POST /api/dev/mock-pay` | dev only (404 in prod) | simulate a payment outcome |
 | `GET /api/cron/email` · `/sweep` · `/cleanup` | `CRON_SECRET` | outbox flush, stale donation sweep, orphan uploads / old page views / rate-limit rows |
-| `/api/admin/*` | admin (moderator for reports) | see 6.11 |
+| `/api/admin/*` | admin | see 6.11 |
 
 ---
 
@@ -338,7 +337,7 @@ Account deletion stays a hard delete via cascade (no `deleted_at` column) by des
 - Abuse: rate limits (5.6), honeypot on sign-up; add Turnstile/hCaptcha if bots appear.
 - Privacy: emails never in public queries; donor identity masked via the view; account deletion path exists; donation rows keep minimal PII.
 - Headers via `next.config.ts` (CSP, `X-Content-Type-Options`, `Referrer-Policy`, frame-ancestors).
-- Audit log for every admin/moderator mutation.
+- Audit log for every admin mutation.
 
 ---
 
@@ -360,7 +359,7 @@ Order inside each: build the service + tests first, then flip the UI to it, then
 ## 11. Testing
 
 1. **DB layer** — `npm run db:smoke` (61 checks, rolled-back transaction) — extend it with each migration.
-2. **Service tests** (Vitest) — run against the real DB inside a rolled-back transaction using a `tx` test helper; assert authz (anonymous / member / owner / moderator / admin) for every operation, plus limits and state transitions.
+2. **Service tests** (Vitest) — run against the real DB inside a rolled-back transaction using a `tx` test helper; assert authz (anonymous / member / owner / admin) for every operation, plus limits and state transitions.
 3. **Route/Action contract tests** — input validation, error shape, 401/403/429 paths.
 4. **Webhook tests** — recorded provider payload fixtures; replay the same event twice (must be a no-op); out-of-order events.
 5. **E2E (Playwright, later)** — sign up → follow → post → comment; donate (mock) → blessing appears.
@@ -378,7 +377,7 @@ Each milestone is shippable and ends with tests green + UI wired + mock removed.
 | **M1** ✅ | Accounts | Sign-up/in/out/reset actions, profile edit, account delete, `admin:create` script, wire `AuthForm` | M0 |
 | **M2** ✅ | Channels (read) + follow | Directory, search/filter/sort, profile, categories, follow; caching + tags; wire pages; seed real channels via admin later | M0 |
 | **M3** ✅ | Community core | Posts, comments, likes, upload flow, notifications (basic); wire provider; remove demo mode | M1 |
-| **M4** ✅ | Moderation | Reports, removals, suspensions, audit log, moderator queue API | M3 |
+| **M4** ✅ | Moderation | Reports, removals, suspensions, audit log, report queue API | M3 |
 | **M5** ✅ | Giving on **mock** | `startDonation`, mock provider + dev endpoint, state machine, blessings, outbox + console emails, subscription model, sweeper | M2 |
 | **M6** ✅ | Admin API | All of 6.11; replace admin fake backend; channel create/approve flow | M2, M4, M5 |
 | **M7** ✅ | Analytics & hardening | Beacon, live visitors, dashboard series, cron routes, rate limits everywhere, security headers, logging | M6 |

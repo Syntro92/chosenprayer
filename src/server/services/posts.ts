@@ -188,12 +188,12 @@ export async function listMemberPosts(
   rawPage: unknown = {},
   conn: Queryable = db,
   store: Storage = realStorage,
-): Promise<{ member: Member; memberStatus: "active" | "suspended"; memberRole: "member" | "moderator" | "admin" } & FeedPage> {
+): Promise<{ member: Member; memberStatus: "active" | "suspended"; memberRole: "member" | "admin" } & FeedPage> {
   const a = requireMember(actor);
   const username = usernameField.safeParse(rawUsername);
   if (!username.success) throw new AppError("NOT_FOUND", "Member not found.");
   // Suspended members are hidden from everyone except admins (who need to find them to unsuspend).
-  const m = await one<MemberRow & { status: "active" | "suspended"; role: "member" | "moderator" | "admin" }>(
+  const m = await one<MemberRow & { status: "active" | "suspended"; role: "member" | "admin" }>(
     `select ${MEMBER_COLUMNS}, pr.status, pr.role from public.profiles pr
      where pr.username = $1 and (pr.status = 'active' or $2)`,
     [username.data, a.role === "admin"],

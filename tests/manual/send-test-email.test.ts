@@ -7,7 +7,7 @@ describe.skipIf(!process.env.SEND_TEST_TO)("send a real test email", () => {
   it("sends the chosen template", async () => {
     const m = renderEmail(process.env.SEND_TEST_TEMPLATE ?? "donation_receipt", {
       name: "Bwave",
-      role: "moderator",
+      role: "admin",
       reason: "Repeated spam in the community feed",
       loginUrl: `${process.env.APP_URL}/signin`,
       channelName: "Chosen Prayer Fund",

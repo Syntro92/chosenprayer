@@ -21,17 +21,17 @@ async function CommunityHome() {
   // Visitors (and suspended members) see the join page; only active members see the feed.
   if (!actor || actor.status !== "active") return <CommunityLanding />;
 
-  const moderator = hasRole(actor, "moderator");
+  const isAdminViewer = hasRole(actor, "admin");
   const [viewer, feed, notifications, openReports] = await Promise.all([
     getViewer(actor),
     listFeed(actor, {}),
     listNotifications(actor),
-    moderator ? countOpenReports(actor) : Promise.resolve(undefined),
+    isAdminViewer ? countOpenReports(actor) : Promise.resolve(undefined),
   ]);
 
   return (
     <CommunityProvider
-      session={{ user: viewer, isModerator: moderator, isAdmin: hasRole(actor, "admin"), openReports }}
+      session={{ user: viewer, isModerator: isAdminViewer, isAdmin: hasRole(actor, "admin"), openReports }}
       initial={{ posts: feed.posts, members: feed.members, nextCursor: feed.nextCursor, notifications }}
     >
       <CommunityFeed />

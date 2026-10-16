@@ -29,7 +29,7 @@ async function Content({ params }: { params: Promise<{ postId: string }> }) {
   const [viewer, { post, members }, thread] = data;
   return (
     <CommunityProvider
-      session={{ user: viewer, isModerator: hasRole(actor, "moderator"), isAdmin: hasRole(actor, "admin") }}
+      session={{ user: viewer, isModerator: hasRole(actor, "admin"), isAdmin: hasRole(actor, "admin") }}
       initial={{
         posts: [post],
         comments: thread.comments,

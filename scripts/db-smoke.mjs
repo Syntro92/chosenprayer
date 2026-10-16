@@ -59,7 +59,7 @@ try {
   const pb = profs.find((p) => p.id === bob);
   ok("profile auto-created with full_name", pa?.display_name === "Alice Perera" && pa?.username === "alice");
   ok("duplicate username auto-suffixed", pb && pb.username !== "alice" && pb.username.startsWith("alice"), pb?.username);
-  await q("update public.profiles set role = 'moderator' where id = $1", [mod]);
+  await q("update public.profiles set role = 'admin' where id = $1", [mod]);
 
   // --- Channels + giving ----------------------------------------------------------
   const { rows: [ch] } = await q(
@@ -180,8 +180,8 @@ try {
   await reset();
 
   await as("authenticated", mod);
-  ok("moderator can delete any post", (await q("delete from public.posts where id = $1", [other.id])).rowCount === 1);
-  ok("moderator can handle reports", (await q("update public.reports set status = 'actioned', handled_by = $1, handled_at = now() where post_id = $2", [mod, post.id])).rowCount === 1);
+  ok("admin can delete any post", (await q("delete from public.posts where id = $1", [other.id])).rowCount === 1);
+  ok("admin can handle reports", (await q("update public.reports set status = 'actioned', handled_by = $1, handled_at = now() where post_id = $2", [mod, post.id])).rowCount === 1);
   await reset();
 
   await as("authenticated", carol);

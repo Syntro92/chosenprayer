@@ -6,8 +6,8 @@ import { AppError } from "../errors";
 import { enforceRateLimit } from "../rate-limit";
 
 /**
- * Members flag a post or comment for moderators. This milestone only RECORDS reports;
- * the moderator queue and the actions that resolve them arrive in M4.
+ * Members flag a post or comment for review. This milestone only RECORDS reports;
+ * the report queue and the actions that resolve them arrive in M4.
  */
 async function file(
   actor: Actor | null,
@@ -42,7 +42,7 @@ async function file(
     );
   } catch (e) {
     if ((e as { code?: string }).code === "23505") {
-      throw new AppError("CONFLICT", `You've already reported this ${kind}. Our moderators will take a look.`);
+      throw new AppError("CONFLICT", `You've already reported this ${kind}. Our team will take a look.`);
     }
     throw e;
   }

@@ -3,7 +3,7 @@ import { AppError } from "../errors";
 // Pure permission rules (no I/O) so they are trivially unit-testable.
 // No "server-only": the Actor type is safe to share.
 
-export type Role = "member" | "moderator" | "admin";
+export type Role = "member" | "admin";
 export type AccountStatus = "active" | "suspended";
 
 /** Who is making a request. `null` everywhere means "anonymous visitor". */
@@ -19,9 +19,9 @@ export interface Actor {
   mustChangePassword?: boolean;
 }
 
-const RANK: Record<Role, number> = { member: 1, moderator: 2, admin: 3 };
+const RANK: Record<Role, number> = { member: 1, admin: 2 };
 
-/** admin >= moderator >= member. */
+/** admin >= member. */
 export function hasRole(actor: Actor | null, min: Role): boolean {
   return !!actor && actor.status === "active" && RANK[actor.role] >= RANK[min];
 }
@@ -39,7 +39,7 @@ export function requireRole(actor: Actor | null, min: Role): Actor {
   return a;
 }
 
-/** Allows the owner of a resource, or anyone at least `min` (e.g. moderators removing content). */
+/** Allows the owner of a resource, or anyone at least `min` (e.g. admins removing content). */
 export function requireOwnerOrRole(actor: Actor | null, ownerId: string | null | undefined, min: Role): Actor {
   const a = requireMember(actor);
   if (ownerId && a.userId === ownerId) return a;
@@ -48,11 +48,9 @@ export function requireOwnerOrRole(actor: Actor | null, ownerId: string | null |
 }
 
 /**
- * Who may act on whose content: admins on members and moderators, moderators on members only.
+ * Who may act on whose content: admins on members only.
  * Nobody moderates an admin (an admin must be demoted by another admin first).
  */
 export function canModerateRole(actorRole: Role, targetRole: Role): boolean {
-  if (actorRole === "admin") return targetRole !== "admin";
-  if (actorRole === "moderator") return targetRole === "member";
-  return false;
+  return actorRole === "admin" && targetRole !== "admin";
 }

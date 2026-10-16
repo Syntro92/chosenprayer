@@ -32,7 +32,6 @@ const colors: Record<string, string> = {
   active: 'success',
   succeeded: 'success',
   member: 'grey',
-  moderator: 'info',
   admin: 'primary',
   pending: 'warning',
   paused: 'warning',

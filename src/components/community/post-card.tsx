@@ -91,7 +91,7 @@ export function PostCard({ post, detail = false }: { post: Post; detail?: boolea
   }
   if (isModerator && !mine) {
     items.push({ label: "Report queue", icon: <ClipboardCheck size={15} />, onSelect: () => router.push("/community/moderation") });
-    items.push({ label: "Remove post (moderator)", icon: <ShieldX size={15} />, onSelect: () => setDialog("remove"), danger: true });
+    items.push({ label: "Remove post (admin)", icon: <ShieldX size={15} />, onSelect: () => setDialog("remove"), danger: true });
   }
   if (isAdmin) {
     items.push(

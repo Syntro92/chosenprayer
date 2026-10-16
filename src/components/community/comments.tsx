@@ -143,7 +143,7 @@ function CommentItem({ c, replies, isReply }: { c: Comment; replies: Comment[]; 
   } else {
     items.push({ label: "Report comment", icon: <Flag size={15} />, onSelect: () => { if (requireAuth()) setDialog("report"); } });
     if (isModerator) {
-      items.push({ label: "Remove comment (moderator)", icon: <ShieldX size={15} />, onSelect: () => setDialog("remove"), danger: true });
+      items.push({ label: "Remove comment (admin)", icon: <ShieldX size={15} />, onSelect: () => setDialog("remove"), danger: true });
     }
     if (isAdmin) {
       items.push({ label: `Block ${author.name}`, icon: <Ban size={15} />, onSelect: () => setDialog("block"), danger: true });

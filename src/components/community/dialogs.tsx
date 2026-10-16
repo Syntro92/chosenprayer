@@ -108,7 +108,7 @@ export function ReportDialog({
     <Modal open={open} onClose={close} labelledBy={id}>
       <h2 id={id} className="text-xl font-semibold tracking-tight">Report this {subject}</h2>
       <p className="mt-2 text-sm leading-relaxed text-slate">
-        Tell us what&apos;s wrong. Reports are reviewed by moderators.
+        Tell us what&apos;s wrong. Reports are reviewed by our team.
       </p>
       <form
         noValidate

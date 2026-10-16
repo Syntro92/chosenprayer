@@ -14,10 +14,10 @@ const resolveSchema = z.discriminatedUnion("action", [
 /**
  * One call for the admin panel's report queue: "dismiss" (content is fine) or "remove" (take the
  * reported post/comment down). Both reuse the audited moderation services, so every report on the
- * same content is closed together. Moderators may do this, not just admins.
+ * same content is closed together. Admins only.
  */
 export async function resolveReport(actor: Actor | null, rawId: string, raw: unknown, conn: Queryable = db): Promise<{ action: "dismiss" | "remove" }> {
-  requireRole(actor, "moderator");
+  requireRole(actor, "admin");
   const id = uuidSchema.safeParse(rawId);
   if (!id.success) throw new AppError("NOT_FOUND", "Report not found.");
   const input = resolveSchema.parse(raw);
