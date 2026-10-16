@@ -66,7 +66,11 @@ describe("email templates", () => {
   it("renders a monthly receipt that explains how to stop", () => {
     const m = renderEmail("donation_receipt", { ...base, frequency: "monthly" });
     expect(m.text).toContain("$25 / month");
-    expect(m.text).toContain("cancel it from your account");
+    expect(m.text).toContain("until you cancel it");
+    const withLink = renderEmail("donation_receipt", { ...base, frequency: "monthly", cancelUrl: "https://x.test/subscription/cancel?token=a.b" });
+    expect(withLink.html).toContain("Cancel monthly support");
+    expect(withLink.text).toContain("https://x.test/subscription/cancel?token=a.b");
+    expect(renderEmail("donation_receipt", { ...base, cancelUrl: "https://x.test/c" }).html).not.toContain("Cancel monthly support");
   });
   it("renders refund and cancellation notices", () => {
     expect(renderEmail("donation_refunded", base).subject).toContain("refunded");

@@ -16,6 +16,7 @@ import { audit } from "./audit";
 import { ISO_US, UUID_RE } from "./community-shared";
 import { enqueueEmail, flushOutboxSoon } from "./email";
 import { notify } from "./notifications";
+import { subscriptionCancelUrl, verifyCancelToken } from "./subscription-links";
 
 /* ------------------------------------------------------------------------ */
 /* Config                                                                    */
@@ -281,6 +282,7 @@ export async function handlePaymentEvent(
     const receipt = async (
       d: { id: string; donor_email: string | null; channel_name: string; amount_cents: number; currency: string; frequency: string },
       receiptUrl?: string | null,
+      subscriptionId?: string | null,
     ) => {
       if (d.donor_email) {
         await enqueueEmail(c, {
@@ -293,6 +295,7 @@ export async function handlePaymentEvent(
             currency: d.currency,
             frequency: d.frequency,
             paidAt: new Date().toISOString(),
+            ...(subscriptionId ? { cancelUrl: subscriptionCancelUrl(subscriptionId) } : {}),
             ...(safeReceiptUrl(receiptUrl) ? { receiptUrl: safeReceiptUrl(receiptUrl) } : {}),
           },
         });
@@ -328,6 +331,7 @@ export async function handlePaymentEvent(
                   receipt_url = coalesce($4, receipt_url), failure_reason = null where id = $1`,
           [d.id, fee, event.providerCustomerId ?? null, safeReceiptUrl(event.receiptUrl)],
         );
+        let subscriptionId: string | null = null;
         if (d.frequency === "monthly" && d.provider_subscription_id) {
           const { rows: [sub] } = await c.query<{ id: string }>(
             `insert into public.subscriptions
@@ -338,8 +342,9 @@ export async function handlePaymentEvent(
             [d.channel_id, d.donor_id, d.donor_email, d.amount_cents, d.currency, providerName, d.provider_subscription_id, event.providerCustomerId ?? null],
           );
           await c.query("update public.donations set subscription_id = $2 where id = $1", [d.id, sub.id]);
+          subscriptionId = sub.id;
         }
-        await receipt(d, event.receiptUrl);
+        await receipt(d, event.receiptUrl, subscriptionId);
         await tellOwner(d);
         handles.add(d.channel_handle);
         break;
@@ -407,7 +412,7 @@ export async function handlePaymentEvent(
           [sub.id, event.periodEnd ?? null],
         );
         const info = { id: created.id, donor_email: sub.donor_email, channel_name: sub.channel_name, amount_cents: event.amountCents, currency: event.currency, frequency: "monthly" };
-        await receipt(info, event.receiptUrl);
+        await receipt(info, event.receiptUrl, sub.id);
         await tellOwner({ owner_id: sub.owner_id, donor_id: sub.donor_id, channel_name: sub.channel_name, channel_handle: sub.channel_handle, amount_cents: event.amountCents, currency: event.currency });
         handles.add(sub.channel_handle);
         break;
@@ -653,20 +658,53 @@ export async function cancelMySubscription(
   const a = requireMember(actor);
   const id = uuidSchema.safeParse(rawId);
   if (!id.success) throw new AppError("NOT_FOUND", "Subscription not found.");
-  const pay = provider ?? getPaymentProvider();
+  await cancelSubscriptionRow(id.data, a.userId, conn, provider ?? getPaymentProvider());
+}
 
-  await inTransaction(conn, async (c) => {
+/**
+ * Cancel from the link in the payment email. The signed token proves the caller got the email, so
+ * no sign-in is needed (guests can have subscriptions too). Idempotent like the account button.
+ */
+export async function cancelSubscriptionByToken(
+  token: string | undefined,
+  conn: Queryable = db,
+  provider?: PaymentProvider,
+): Promise<{ channelName: string }> {
+  const id = verifyCancelToken(token);
+  if (!id) throw new AppError("NOT_FOUND", "This cancel link isn't valid.");
+  return cancelSubscriptionRow(id, null, conn, provider ?? getPaymentProvider());
+}
+
+/** What the cancel page shows before the supporter confirms. Null when the link is bad. */
+export async function getSubscriptionForCancel(
+  token: string | undefined,
+  conn: Queryable = db,
+): Promise<{ channelName: string; amountCents: number; currency: string; canceled: boolean } | null> {
+  const id = verifyCancelToken(token);
+  if (!id) return null;
+  const s = await one<{ status: string; amount_cents: number; currency: string; channel_name: string }>(
+    `select s.status, s.amount_cents, s.currency, c.name as channel_name
+     from public.subscriptions s join public.channels c on c.id = s.channel_id where s.id = $1`,
+    [id],
+    conn,
+  );
+  return s ? { channelName: s.channel_name, amountCents: s.amount_cents, currency: s.currency, canceled: s.status === "canceled" } : null;
+}
+
+/** `donorId` null means the caller was already authorized (a verified email link). */
+async function cancelSubscriptionRow(id: string, donorId: string | null, conn: Queryable, pay: PaymentProvider) {
+  const channelName = await inTransaction(conn, async (c) => {
     const s = await one<{ status: string; provider_subscription_id: string | null; donor_email: string | null; amount_cents: number; currency: string; channel_name: string }>(
       `select s.status, s.provider_subscription_id, s.donor_email::text as donor_email, s.amount_cents, s.currency, c.name as channel_name
        from public.subscriptions s join public.channels c on c.id = s.channel_id
-       where s.id = $1 and s.donor_id = $2 for update of s`,
-      [id.data, a.userId],
+       where s.id = $1 and ($2::uuid is null or s.donor_id = $2) for update of s`,
+      [id, donorId],
       c,
     );
     if (!s) throw new AppError("NOT_FOUND", "Subscription not found.");
-    if (s.status === "canceled") return;
+    if (s.status === "canceled") return s.channel_name;
     if (s.provider_subscription_id) await pay.cancelSubscription(s.provider_subscription_id); // if this throws, nothing below is saved
-    await c.query("update public.subscriptions set status = 'canceled', canceled_at = now() where id = $1", [id.data]);
+    await c.query("update public.subscriptions set status = 'canceled', canceled_at = now() where id = $1", [id]);
     if (s.donor_email) {
       await enqueueEmail(c, {
         to: s.donor_email,
@@ -674,8 +712,10 @@ export async function cancelMySubscription(
         payload: { channelName: s.channel_name, amountCents: s.amount_cents, currency: s.currency },
       });
     }
+    return s.channel_name;
   });
   await flushOutboxSoon(conn);
+  return { channelName };
 }
 
 /**

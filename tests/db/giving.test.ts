@@ -7,6 +7,8 @@ import { createBlessing } from "@/server/services/blessings";
 import {
   adminRefund,
   cancelMySubscription,
+  cancelSubscriptionByToken,
+  getSubscriptionForCancel,
   getDonationStatus,
   getGivingConfig,
   handlePaymentEvent,
@@ -17,6 +19,7 @@ import {
   sweepStaleDonations,
 } from "@/server/services/giving";
 import { getChannelProfile } from "@/server/services/channels";
+import { subscriptionCancelUrl } from "@/server/services/subscription-links";
 import { listNotifications } from "@/server/services/notifications";
 import { channel, FakeProvider, member, saturate } from "../helpers/fixtures";
 import { withRollback } from "../helpers/rollback";
@@ -487,6 +490,54 @@ describe("cancelMySubscription", () => {
       await expect(cancelMySubscription(me, randomUUID(), c, prov)).rejects.toMatchObject({ code: "NOT_FOUND" });
       await expect(cancelMySubscription(me, "nope", c, prov)).rejects.toMatchObject({ code: "NOT_FOUND" });
       await expect(cancelMySubscription(null, sub.id, c, prov)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
+    }));
+});
+
+describe("cancel from the payment email", () => {
+  const tokenOf = (url: string) => new URL(url).searchParams.get("token")!;
+
+  it("monthly receipt carries a cancel link that works for a guest, once", () =>
+    withRollback(async (c) => {
+      const ch = await channel(c);
+      const prov = new FakeProvider();
+      const g = await paid(c, null, ch, { frequency: "monthly", donorEmail: "guest-cancel@example.com" }, prov);
+      const receipt = (await outbox(c, "guest-cancel@example.com")).find((m) => m.template === "donation_receipt")!;
+      const url = receipt.payload.cancelUrl as string;
+      expect(url).toContain("/subscription/cancel?token=");
+      const token = tokenOf(url);
+
+      expect(await getSubscriptionForCancel(token, c)).toMatchObject({ canceled: false, amountCents: 2500 });
+      await cancelSubscriptionByToken(token, c, prov);
+      await cancelSubscriptionByToken(token, c, prov); // idempotent
+      expect(prov.canceled).toEqual([await subOf(c, g.donationId)]);
+      expect((await getSubscriptionForCancel(token, c))?.canceled).toBe(true);
+      expect((await outbox(c, "guest-cancel@example.com")).filter((m) => m.template === "subscription_canceled")).toHaveLength(1);
+    }));
+
+  it("one-time receipts have no cancel link; forged or tampered tokens are rejected", () =>
+    withRollback(async (c) => {
+      const ch = await channel(c);
+      await paid(c, null, ch, { donorEmail: "once@example.com" });
+      expect((await outbox(c, "once@example.com"))[0].payload.cancelUrl).toBeUndefined();
+
+      const id = randomUUID();
+      const good = tokenOf(subscriptionCancelUrl(id));
+      for (const bad of [undefined, "", "junk", `${id}.`, `${id}.AAAA`, `${randomUUID()}.${good.split(".")[1]}`, `${good}.x`]) {
+        await expect(cancelSubscriptionByToken(bad, c, new FakeProvider())).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(await getSubscriptionForCancel(bad, c)).toBeNull();
+      }
+      // A genuine token for a subscription that doesn't exist
+      await expect(cancelSubscriptionByToken(good, c, new FakeProvider())).rejects.toMatchObject({ code: "NOT_FOUND" });
+    }));
+
+  it("renewal receipts carry the link too", () =>
+    withRollback(async (c) => {
+      const ch = await channel(c);
+      const g = await paid(c, null, ch, { frequency: "monthly", donorEmail: "renew-link@example.com" });
+      await handle(c, { type: "subscription.renewed", eventId: randomUUID(), providerSubscriptionId: await subOf(c, g.donationId), providerPaymentId: "pi_renew_link", amountCents: 2500, currency: "USD" });
+      const receipts = (await outbox(c, "renew-link@example.com")).filter((m) => m.template === "donation_receipt");
+      expect(receipts).toHaveLength(2);
+      expect(receipts.every((m) => typeof m.payload.cancelUrl === "string")).toBe(true);
     }));
 });
 

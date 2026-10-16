@@ -11,6 +11,7 @@ import { createBlessing } from "@/server/services/blessings";
 import { reconcileStripeDonation } from "@/server/services/stripe-webhook";
 import {
   cancelMySubscription,
+  cancelSubscriptionByToken,
   getDonationStatus,
   getGivingConfig,
   simulateMockPayment,
@@ -68,4 +69,9 @@ export async function createBlessingAction(input: unknown) {
 
 export async function cancelSubscriptionAction(subscriptionId: string) {
   return action("cancelSubscription", async () => cancelMySubscription(await getActor(), subscriptionId));
+}
+
+/** The "Cancel monthly support" button in the payment email: the signed token is the authorization. */
+export async function cancelSubscriptionByTokenAction(token: string) {
+  return action("cancelSubscriptionByToken", async () => cancelSubscriptionByToken(token));
 }
