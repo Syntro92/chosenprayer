@@ -39,9 +39,7 @@ export interface AdminChannelDetail extends AdminChannel {
   coverTone: string;
   coverScene: string;
   avatarPath: string | null;
-  coverPath: string | null;
   avatarUrl: string | null;
-  coverUrl: string | null;
   donationCount: number;
   youtubeChannelId: string | null;
   youtubeSubscribers: number | null;
@@ -61,7 +59,7 @@ interface Row {
   follower_count: number; supporter_count: number; blessing_count: number; total_raised_cents: number;
   owner_id: string | null; owner_name: string | null; owner_username: string | null;
   created_at: string; published_at: string | null;
-  mission?: string; about?: string[]; cover_tone?: string; cover_scene?: string; avatar_path?: string | null; cover_path?: string | null; donation_count?: number;
+  mission?: string; about?: string[]; cover_tone?: string; cover_scene?: string; avatar_path?: string | null; donation_count?: number;
   youtube_channel_id?: string | null; youtube_subscribers?: string | null; youtube_synced_at?: string | null;
 }
 
@@ -71,7 +69,7 @@ const SELECT = `
          c.follower_count, c.supporter_count, c.blessing_count, c.total_raised_cents,
          c.owner_id, o.display_name as owner_name, o.username::text as owner_username,
          c.created_at::text as created_at, c.published_at::text as published_at,
-         c.mission, c.about, c.cover_tone::text as cover_tone, c.cover_scene::text as cover_scene, c.avatar_path, c.cover_path,
+         c.mission, c.about, c.cover_tone::text as cover_tone, c.cover_scene::text as cover_scene, c.avatar_path,
          c.youtube_channel_id, c.youtube_subscribers::text as youtube_subscribers, c.youtube_synced_at::text as youtube_synced_at,
          (select count(*)::int from public.donations d where d.channel_id = c.id and d.status = 'succeeded') as donation_count
   from public.channels c
@@ -106,9 +104,7 @@ const toDetail = (r: Row): AdminChannelDetail => ({
   coverTone: r.cover_tone ?? "cream",
   coverScene: r.cover_scene ?? "horizon",
   avatarPath: r.avatar_path ?? null,
-  coverPath: r.cover_path ?? null,
   avatarUrl: channelImageUrl(r.avatar_path),
-  coverUrl: channelImageUrl(r.cover_path),
   donationCount: r.donation_count ?? 0,
   youtubeChannelId: r.youtube_channel_id ?? null,
   youtubeSubscribers: r.youtube_subscribers == null ? null : Number(r.youtube_subscribers),
@@ -189,17 +185,17 @@ export async function createAdminChannel(actor: Actor | null, raw: unknown, conn
       ownerId = owner.id;
     }
 
-    await assertImagesExist([input.avatarPath, input.coverPath], c);
+    await assertImagesExist([input.avatarPath], c);
 
     const taken = await one("select 1 as ok from public.channels where handle = $1", [input.handle], c);
     if (taken) throw new AppError("CONFLICT", "That handle is already taken.", { fields: { handle: "That handle is already taken" } });
 
     const created = await one<{ id: string }>(
       `insert into public.channels
-         (handle, owner_id, name, description, about, mission, category, cover_tone, cover_scene, status, featured, verified, currency, show_blessings, avatar_path, cover_path, published_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::public.channel_status, $11, $12, $13, $14, $15, $16, case when $10::text = 'active' then now() end)
+         (handle, owner_id, name, description, about, mission, category, cover_tone, cover_scene, status, featured, verified, currency, show_blessings, avatar_path, published_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::public.channel_status, $11, $12, $13, $14, $15, case when $10::text = 'active' then now() end)
        returning id`,
-      [input.handle, ownerId, input.name, input.description, input.about, input.mission, input.category, input.coverTone, input.coverScene, input.status, input.featured, input.verified, input.currency, input.showBlessings, input.avatarPath ?? null, input.coverPath ?? null],
+      [input.handle, ownerId, input.name, input.description, input.about, input.mission, input.category, input.coverTone, input.coverScene, input.status, input.featured, input.verified, input.currency, input.showBlessings, input.avatarPath ?? null],
       c,
     );
     if (yt) await saveYoutubeData(c, created!.id, yt);
@@ -223,17 +219,16 @@ export async function updateAdminChannel(actor: Actor | null, rawId: string, raw
 
   let replaced: (string | null)[] = [];
   const result = await inTransaction(conn, async (c) => {
-    const before = await one<{ handle: string; avatar_path: string | null; cover_path: string | null }>(
-      "select handle::text as handle, avatar_path, cover_path from public.channels where id = $1 for update",
+    const before = await one<{ handle: string; avatar_path: string | null }>(
+      "select handle::text as handle, avatar_path from public.channels where id = $1 for update",
       [id.data],
       c,
     );
     if (!before) throw notFound();
-    await assertImagesExist([patch.avatarPath, patch.coverPath], c);
+    await assertImagesExist([patch.avatarPath], c);
     // Files no longer referenced after this save (replaced or removed), deleted once it commits.
     replaced = [
       patch.avatarPath !== undefined && patch.avatarPath !== before.avatar_path ? before.avatar_path : null,
-      patch.coverPath !== undefined && patch.coverPath !== before.cover_path ? before.cover_path : null,
     ];
     if (patch.category) {
       const ok = await one("select 1 as ok from public.categories where slug = $1", [patch.category], c);
@@ -249,7 +244,6 @@ export async function updateAdminChannel(actor: Actor | null, rawId: string, raw
       cover_tone: patch.coverTone,
       cover_scene: patch.coverScene,
       avatar_path: patch.avatarPath,
-      cover_path: patch.coverPath,
       featured: patch.featured,
       verified: patch.verified,
       show_blessings: patch.showBlessings,

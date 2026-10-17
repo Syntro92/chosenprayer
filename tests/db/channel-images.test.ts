@@ -75,18 +75,20 @@ describe("channel images on create / update", () => {
     withRollback(async (c) => {
       const a = await member(c, { role: "admin" });
       const avatarPath = await stored(c);
-      const coverPath = await stored(c, "jpg");
-      const { channel: ch } = await createAdminChannel(a, newChannel({ avatarPath, coverPath }), c);
-      expect(ch).toMatchObject({ avatarPath, coverPath, avatarUrl: channelImageUrl(avatarPath), coverUrl: channelImageUrl(coverPath) });
+      const { channel: ch } = await createAdminChannel(a, newChannel({ avatarPath }), c);
+      expect(ch).toMatchObject({ avatarPath, avatarUrl: channelImageUrl(avatarPath) });
       const profile = await getChannelProfile(ch.handle, c);
-      expect(profile.channel).toMatchObject({ avatarUrl: channelImageUrl(avatarPath), coverUrl: channelImageUrl(coverPath) });
+      expect(profile.channel).toMatchObject({ avatarUrl: channelImageUrl(avatarPath) });
+      // Channels no longer have a cover image: nothing about one is stored or returned.
+      expect(ch).not.toHaveProperty("coverPath");
+      expect(profile.channel).not.toHaveProperty("coverUrl");
     }));
 
   it("defaults to no images", () =>
     withRollback(async (c) => {
       const a = await member(c, { role: "admin" });
       const { channel: ch } = await createAdminChannel(a, newChannel(), c);
-      expect(ch).toMatchObject({ avatarPath: null, coverPath: null, avatarUrl: null, coverUrl: null });
+      expect(ch).toMatchObject({ avatarPath: null, avatarUrl: null });
     }));
 
   it("replaces and removes images on update; omitting them leaves them alone", () =>
@@ -99,8 +101,8 @@ describe("channel images on create / update", () => {
       expect(untouched.channel.avatarPath).toBe(first);
 
       const second = await stored(c);
-      const replaced = await updateAdminChannel(a, ch.id, { avatarPath: second, coverPath: null }, c);
-      expect(replaced.channel).toMatchObject({ avatarPath: second, coverPath: null });
+      const replaced = await updateAdminChannel(a, ch.id, { avatarPath: second }, c);
+      expect(replaced.channel).toMatchObject({ avatarPath: second });
 
       const removed = await updateAdminChannel(a, ch.id, { avatarPath: null }, c);
       expect(removed.channel).toMatchObject({ avatarPath: null, avatarUrl: null });
@@ -113,7 +115,7 @@ describe("channel images on create / update", () => {
       await expect(createAdminChannel(a, newChannel({ avatarPath: `channels/${randomUUID()}.png` }), c)).rejects.toMatchObject({ code: "VALIDATION" });
       // malformed / path traversal: rejected by the schema (zod), before any query
       for (const bad of ["../secrets.png", "posts/x/y.png", "channels/abc.png", "https://evil.example/x.png"]) {
-        await expect(createAdminChannel(a, newChannel({ coverPath: bad }), c)).rejects.toThrow();
+        await expect(createAdminChannel(a, newChannel({ avatarPath: bad }), c)).rejects.toThrow();
       }
     }));
 });

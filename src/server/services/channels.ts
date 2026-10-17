@@ -19,7 +19,6 @@ export interface ChannelSummary {
   createdAt: string; // ISO timestamp
   cover: { tone: "cream" | "mist" | "sage" | "stone"; scene: "horizon" | "hills" | "sun" | "waves" };
   avatarUrl: string | null; // uploaded profile picture
-  coverUrl: string | null; // uploaded cover image
   featured: boolean;
   verified: boolean;
 }
@@ -92,7 +91,6 @@ interface SummaryRow {
   cover_tone: ChannelSummary["cover"]["tone"];
   cover_scene: ChannelSummary["cover"]["scene"];
   avatar_path: string | null;
-  cover_path: string | null;
   featured: boolean;
   verified: boolean;
   id: string;
@@ -102,7 +100,7 @@ interface SummaryRow {
 const SUMMARY_COLUMNS = `
   c.id, c.handle::text as handle, c.name, c.description, cat.name as category, cat.slug as category_slug,
   c.follower_count, c.supporter_count, c.youtube_subscribers::text as youtube_subscribers, to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as created_raw,
-  c.cover_tone, c.cover_scene, c.avatar_path, c.cover_path, c.featured, c.verified, lower(c.name) as name_key`;
+  c.cover_tone, c.cover_scene, c.avatar_path, c.featured, c.verified, lower(c.name) as name_key`;
 
 const toSummary = (r: SummaryRow): ChannelSummary => ({
   handle: r.handle,
@@ -116,7 +114,6 @@ const toSummary = (r: SummaryRow): ChannelSummary => ({
   createdAt: new Date(r.created_raw).toISOString(),
   cover: { tone: r.cover_tone, scene: r.cover_scene },
   avatarUrl: channelImageUrl(r.avatar_path),
-  coverUrl: channelImageUrl(r.cover_path),
   featured: r.featured,
   verified: r.verified,
 });
