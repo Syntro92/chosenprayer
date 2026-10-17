@@ -19,13 +19,16 @@ defineProps<{
   addTo?: string;
   addLabel?: string;
 }>();
-const slotNames: string[] = Object.keys(useSlots()).filter((n) => n !== 'filters');
+const slotNames: string[] = Object.keys(useSlots()).filter((n) => n !== 'filters' && n !== 'above');
 const page = defineModel<number>('page', { required: true });
 defineEmits<{ (e: 'retry'): void; (e: 'row', item: any): void }>();
 </script>
 
 <template>
   <BaseBreadcrumb :title="title" :breadcrumbs="[{ title: 'Main', disabled: false, href: '#' }, { title, disabled: true, href: '#' }]" />
+  <v-row v-if="$slots.above">
+    <v-col cols="12"><slot name="above" /></v-col>
+  </v-row>
   <v-row>
     <v-col cols="12">
       <UiParentCard :title="title">

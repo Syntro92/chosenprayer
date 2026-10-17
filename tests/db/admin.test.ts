@@ -274,8 +274,8 @@ describe("admin users", () => {
       const u = await member(c);
       const auth = new FakeAuth();
 
-      let out = await updateAdminUser(a, u.userId, { role: "admin", verified: true }, c, auth);
-      expect(out).toMatchObject({ role: "admin", verified: true });
+      let out = await updateAdminUser(a, u.userId, { verified: true }, c, auth);
+      expect(out).toMatchObject({ verified: true });
 
       expect(await invalid(updateAdminUser(a, u.userId, { status: "suspended" }, c, auth))).toMatchObject({ code: "VALIDATION", fields: { reason: expect.any(String) } });
       out = await updateAdminUser(a, u.userId, { status: "suspended", reason: "Abuse" }, c, auth);
@@ -285,6 +285,10 @@ describe("admin users", () => {
       out = await updateAdminUser(a, u.userId, { status: "active" }, c, auth);
       expect(out.status).toBe("active");
       expect(auth.calls[1]).toEqual([u.userId, false]);
+
+      // Admins can't be suspended, so the promotion comes last.
+      out = await updateAdminUser(a, u.userId, { role: "admin" }, c, auth);
+      expect(out.role).toBe("admin");
 
       expect(out.history.map((h) => h.action)).toEqual(expect.arrayContaining(["user.set_role", "user.verify", "user.suspend", "user.unsuspend"]));
       expect(out.history[0].by).toBe("Ada Admin");
@@ -439,6 +443,7 @@ describe("dashboard, analytics, live and health", () => {
 
   it("analytics aggregates page views (bots excluded) over the chosen range", () =>
     withRollback(async (c) => {
+      await c.query("delete from public.page_views", []); // rolled back; real traffic would crowd the test paths out of the top list
       const a = await admin(c);
       const base = await getAnalytics(a, { range: "7d" }, c);
       const v1 = randomUUID();

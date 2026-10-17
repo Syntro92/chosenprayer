@@ -2,6 +2,7 @@ import "server-only";
 import { channelListSchema, handleSchema, type ChannelListInput } from "@/lib/schemas/channels";
 import { db, one, rows, type Queryable } from "../db";
 import { AppError } from "../errors";
+import { readGivingSettings } from "./giving-settings";
 import { clampLimit, decodeCursor, toPage, type Cursor, type Page } from "../pagination";
 import { channelImageUrl } from "../storage";
 
@@ -50,7 +51,14 @@ export interface ChannelProfileData {
   blessingsCount: number;
   /** False when an admin switched blessings off for this channel. */
   showBlessings: boolean;
+  /** False (the default) unless an admin switched the site-wide Top Supporters list on (Admin > Channels > Support settings). */
+  showTopSupporters: boolean;
+  topSupporters: { name: string; total: number }[];
+  givingPresets: number[];
 }
+
+/** How many supporters the public list shows. */
+export const TOP_SUPPORTERS_LIMIT = 5;
 
 export interface Category {
   slug: string;
@@ -266,6 +274,26 @@ export async function getChannelProfile(
       )
     : [];
 
+  // Ranked by what each person has given in succeeded donations (refunds drop out). A supporter is
+  // the signed-in member, else the guest's email. Anyone without a name, or who left an anonymous
+  // blessing here, is shown as "Anonymous". Emails and ids never leave this function.
+  const giving = await readGivingSettings(conn);
+  const supporters = giving.showTopSupporters
+    ? await rows<{ name: string | null; anonymous: boolean; total_cents: number }>(
+        `select coalesce((array_agg(p.display_name) filter (where p.display_name is not null))[1],
+                         (array_agg(d.donor_name order by d.paid_at desc) filter (where d.donor_name is not null))[1]) as name,
+                bool_or(exists (select 1 from public.blessings b where b.donation_id = d.id and b.is_anonymous)) as anonymous,
+                sum(d.amount_cents)::float8 as total_cents
+         from public.donations d
+         left join public.profiles p on p.id = d.donor_id
+         where d.channel_id = $1 and d.status = 'succeeded'
+         group by coalesce(d.donor_id::text, lower(d.donor_email::text), d.id::text)
+         order by total_cents desc, min(d.paid_at), coalesce(d.donor_id::text, lower(d.donor_email::text), d.id::text)
+         limit $2`,
+        [base.id, TOP_SUPPORTERS_LIMIT],
+        conn,
+      )
+    : [];
 
   return {
     channel: toSummary(base),
@@ -292,6 +320,12 @@ export async function getChannelProfile(
       })),
       blessingsCount: base.show_blessings ? base.blessing_count : 0,
       showBlessings: base.show_blessings,
+      showTopSupporters: giving.showTopSupporters,
+      givingPresets: giving.presets,
+      topSupporters: supporters.map((s) => ({
+        name: s.anonymous || !s.name ? "Anonymous" : s.name,
+        total: Math.round(s.total_cents / 100),
+      })),
     },
   };
 }

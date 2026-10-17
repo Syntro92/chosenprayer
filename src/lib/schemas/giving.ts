@@ -12,7 +12,7 @@ export const startDonationSchema = z.object({
   amount: z.coerce
     .number()
     .int("Enter a whole amount")
-    .min(GIVING_LIMITS.minAmount, `The minimum is ${GIVING_LIMITS.minAmount}`)
+    .min(1, "Enter an amount")
     .max(GIVING_LIMITS.maxAmount, `The maximum is ${GIVING_LIMITS.maxAmount.toLocaleString("en")}`),
   frequency: z.enum(["once", "monthly"]).default("once"),
   /** Guests only; signed-in members are identified by their account. */

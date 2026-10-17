@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { cancelSubscriptionAction } from "@/actions/giving";
+import { cancelSubscriptionAction, requestRefundAction } from "@/actions/giving";
 import { formatMoney } from "@/lib/giving";
 import type { MyDonation, MySubscription } from "@/server/services/giving";
 
@@ -86,6 +86,52 @@ function SubscriptionRow({ sub }: { sub: MySubscription }) {
   );
 }
 
+function RefundControl({ id }: { id: string }) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function refund() {
+    setBusy(true);
+    setError("");
+    const r = await requestRefundAction(id);
+    setBusy(false);
+    if (!r.ok) return setError(r.error.message);
+    setConfirming(false);
+    router.refresh();
+  }
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className={`ml-3 rounded font-medium text-slate underline underline-offset-4 hover:text-charcoal-deep ${focus}`}
+      >
+        Request refund
+      </button>
+    );
+  }
+  return (
+    <span className="ml-3 inline-flex flex-wrap items-center gap-2 font-normal">
+      <span className="text-slate">Refund to your original payment method?</span>
+      <button
+        type="button"
+        onClick={refund}
+        disabled={busy}
+        className={`rounded font-semibold text-red-700 underline underline-offset-4 disabled:opacity-60 ${focus}`}
+      >
+        {busy ? "Refunding…" : "Yes, refund"}
+      </button>
+      <button type="button" onClick={() => setConfirming(false)} disabled={busy} className={`rounded text-slate underline underline-offset-4 ${focus}`}>
+        Keep gift
+      </button>
+      {error && <span role="alert" className="basis-full text-red-700">{error}</span>}
+    </span>
+  );
+}
+
 export function GivingSection({ donations, subscriptions }: { donations: MyDonation[]; subscriptions: MySubscription[] }) {
   return (
     <section className={card} aria-labelledby="giving-h">
@@ -135,6 +181,7 @@ export function GivingSection({ donations, subscriptions }: { donations: MyDonat
                           Receipt
                         </a>
                       )}
+                      {d.status === "succeeded" && <RefundControl id={d.id} />}
                     </span>
                   </li>
                 ))}

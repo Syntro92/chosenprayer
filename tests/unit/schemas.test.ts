@@ -107,15 +107,14 @@ describe("safeNext (open-redirect guard)", () => {
   });
 });
 
-describe("startDonationSchema minimum amount", () => {
+describe("startDonationSchema amount", () => {
+  // The admin-set minimum donation (Support settings) is enforced by the service, against the database.
   const base = { channelHandle: "somechannel1", frequency: "once", idempotencyKey: "key-12345678" };
-  it.each([0, 1, 4])("rejects %i, below the 5 minimum", async (amount) => {
+  it.each([0, -5, 1.5])("rejects %s", async (amount) => {
     const { startDonationSchema } = await import("@/lib/schemas/giving");
-    const r = startDonationSchema.safeParse({ ...base, amount });
-    expect(r.success).toBe(false);
-    if (!r.success) expect(r.error.issues[0].message).toBe("The minimum is 5");
+    expect(startDonationSchema.safeParse({ ...base, amount }).success).toBe(false);
   });
-  it.each([5, 25, 999_999])("accepts %i", async (amount) => {
+  it.each([1, 25, 26, 999_999])("accepts %i", async (amount) => {
     const { startDonationSchema } = await import("@/lib/schemas/giving");
     expect(startDonationSchema.safeParse({ ...base, amount }).success).toBe(true);
   });

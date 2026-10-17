@@ -113,7 +113,7 @@ describe.skipIf(!live)("Stripe sandbox, end to end", () => {
   });
 
   it("monthly gift: real subscription -> first invoice paid -> subscription row; cancelling on Stripe cancels it here", async () => {
-    const d = await begin({ frequency: "monthly", amount: 10 });
+    const d = await begin({ frequency: "monthly", amount: 25 });
     const row = (await getPool().query("select provider_payment_id p, provider_subscription_id s from public.donations where id = $1", [d.donationId])).rows[0];
     paymentIds.push(row.p);
     subscriptionIds.push(row.s);
@@ -125,7 +125,7 @@ describe.skipIf(!live)("Stripe sandbox, end to end", () => {
       const r = await donation(d.donationId);
       return r.status === "succeeded" && r.subscription_id ? r : null;
     });
-    expect(paid.amount_cents).toBe(1000);
+    expect(paid.amount_cents).toBe(2500);
     expect((await getPool().query("select status from public.subscriptions where provider_subscription_id = $1", [row.s])).rows[0].status).toBe("active");
 
     await provider.cancelSubscription(row.s);

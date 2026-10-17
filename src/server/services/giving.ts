@@ -15,8 +15,9 @@ import { z } from "zod";
 import { audit } from "./audit";
 import { ISO_US, UUID_RE } from "./community-shared";
 import { enqueueEmail, flushOutboxSoon } from "./email";
+import { readGivingSettings } from "./giving-settings";
 import { notify } from "./notifications";
-import { subscriptionCancelUrl, verifyCancelToken } from "./subscription-links";
+import { donationRefundUrl, subscriptionCancelUrl, verifyCancelToken, verifyRefundToken } from "./subscription-links";
 
 /* ------------------------------------------------------------------------ */
 /* Config                                                                    */
@@ -36,7 +37,7 @@ export interface GivingConfig {
   maxAmount: number;
 }
 
-export async function getGivingConfig(): Promise<GivingConfig> {
+export async function getGivingConfig(conn: Queryable = db): Promise<GivingConfig> {
   let usable = true;
   try {
     getPaymentProvider();
@@ -50,7 +51,7 @@ export async function getGivingConfig(): Promise<GivingConfig> {
     publishableKey: mode.provider === "stripe" ? (getEnv().STRIPE_PUBLISHABLE_KEY ?? null) : null,
     available: usable,
     recurring: true,
-    minAmount: GIVING_LIMITS.minAmount,
+    minAmount: (await readGivingSettings(conn)).minDonation,
     maxAmount: GIVING_LIMITS.maxAmount,
   };
 }
@@ -163,6 +164,12 @@ export async function startDonation(
     conn,
   );
   if (!channel) throw new AppError("NOT_FOUND", "Channel not found.");
+
+  // The minimum is an admin setting (Admin > Channels > Support settings), so it is checked here, not in the schema.
+  const { minDonation } = await readGivingSettings(conn);
+  if (input.amount < minDonation) {
+    throw new AppError("VALIDATION", `The minimum is ${minDonation}.`, { fields: { amount: `The minimum is ${minDonation}` } });
+  }
 
   let email: string | null = input.donorEmail ?? null;
   let name: string | null = input.donorName || null;
@@ -295,6 +302,7 @@ export async function handlePaymentEvent(
             currency: d.currency,
             frequency: d.frequency,
             paidAt: new Date().toISOString(),
+            refundUrl: donationRefundUrl(d.id),
             ...(subscriptionId ? { cancelUrl: subscriptionCancelUrl(subscriptionId) } : {}),
             ...(safeReceiptUrl(receiptUrl) ? { receiptUrl: safeReceiptUrl(receiptUrl) } : {}),
           },
@@ -733,22 +741,92 @@ export async function adminRefund(
   const id = uuidSchema.safeParse(rawId);
   if (!id.success) throw new AppError("NOT_FOUND", "Donation not found.");
   const { reason } = z.object({ reason: z.string().trim().min(1, "Please give a reason.").max(300) }).parse(raw);
-  const pay = provider ?? getPaymentProvider();
+  return refundDonation(id.data, null, a.userId, reason, {}, conn, provider ?? getPaymentProvider());
+}
 
+/**
+ * A member asks for their own gift back. It is refunded immediately, to the card it was paid with
+ * (the provider refunds the original payment method; there is no other destination). Only the
+ * signed-in donor can do this, so guest gifts still go through an admin. Monthly support is NOT
+ * canceled: stopping future payments is the separate "Cancel monthly support" button.
+ */
+export async function requestMyRefund(
+  actor: Actor | null,
+  rawId: string,
+  conn: Queryable = db,
+  provider?: PaymentProvider,
+): Promise<{ channelHandle: string }> {
+  const a = requireMember(actor);
+  const id = uuidSchema.safeParse(rawId);
+  if (!id.success) throw new AppError("NOT_FOUND", "Donation not found.");
+  return refundDonation(id.data, a.userId, a.userId, "Requested by donor", { requestedBy: "donor" }, conn, provider ?? getPaymentProvider());
+}
+
+/**
+ * Refund from the link in the receipt email. The signed token proves the caller got the email, so no
+ * sign-in is needed (guests too). Same rules and the same refund as the account button.
+ */
+export async function refundByToken(
+  token: string | undefined,
+  conn: Queryable = db,
+  provider?: PaymentProvider,
+): Promise<{ channelHandle: string }> {
+  const id = verifyRefundToken(token);
+  if (!id) throw new AppError("NOT_FOUND", "This refund link isn't valid.");
+  return refundDonation(id, null, null, "Requested by donor (email link)", { requestedBy: "donor", via: "email" }, conn, provider ?? getPaymentProvider());
+}
+
+/** What the refund page shows before the donor confirms. Null when the link is bad. */
+export async function getDonationForRefund(
+  token: string | undefined,
+  conn: Queryable = db,
+): Promise<{ channelName: string; amountCents: number; currency: string; status: DonationRow["status"] } | null> {
+  const id = verifyRefundToken(token);
+  if (!id) return null;
+  const d = await one<{ status: DonationRow["status"]; amount_cents: number; currency: string; channel_name: string }>(
+    `select d.status, d.amount_cents, d.currency, c.name as channel_name
+     from public.donations d join public.channels c on c.id = d.channel_id where d.id = $1`,
+    [id],
+    conn,
+  );
+  return d ? { channelName: d.channel_name, amountCents: d.amount_cents, currency: d.currency, status: d.status } : null;
+}
+
+/**
+ * `donorId` non-null restricts to that donor's own gift (anything else is NOT_FOUND, so ids can't be
+ * probed). The provider is asked first; only if it succeeds is the donation marked refunded, the
+ * donor emailed and the action audited, all in one transaction.
+ */
+async function refundDonation(
+  donationId: string,
+  donorId: string | null,
+  actorId: string | null,
+  reason: string,
+  extra: Record<string, unknown>,
+  conn: Queryable,
+  pay: PaymentProvider,
+): Promise<{ channelHandle: string }> {
+  const isAdmin = extra.requestedBy !== "donor"; // admins see the raw provider error; donors get a friendly one
   const result = await inTransaction(conn, async (c) => {
-    const d = await one<DonationRow>(`${DONATION_SQL} where d.id = $1 for update of d`, [id.data], c);
-    if (!d) throw new AppError("NOT_FOUND", "Donation not found.");
+    const d = await one<DonationRow>(`${DONATION_SQL} where d.id = $1 for update of d`, [donationId], c);
+    if (!d || (donorId !== null && d.donor_id !== donorId)) throw new AppError("NOT_FOUND", "Donation not found.");
     if (d.status === "refunded") throw new AppError("CONFLICT", "That donation has already been refunded.");
     if (d.status !== "succeeded" || !d.provider_payment_id) throw new AppError("CONFLICT", "Only completed donations can be refunded.");
 
-    await pay.refund(d.provider_payment_id);
+    try {
+      await pay.refund(d.provider_payment_id);
+    } catch (e) {
+      if (isAdmin) throw e;
+      log.error("donor refund failed at the payment provider", errorFields(e));
+      throw new AppError("PAYMENT_FAILED", "We couldn't process your refund. You haven't been refunded yet. Please try again or contact us.", { cause: e });
+    }
     await markRefunded(c, d, true);
     await audit(c, {
-      actorId: a.userId,
+      actorId,
       action: "donation.refund",
       entityType: "donation",
       entityId: d.id,
-      metadata: { reason, amountCents: d.amount_cents, currency: d.currency, channel: d.channel_handle },
+      metadata: { reason, amountCents: d.amount_cents, currency: d.currency, channel: d.channel_handle, ...extra },
     });
     return { channelHandle: d.channel_handle };
   });

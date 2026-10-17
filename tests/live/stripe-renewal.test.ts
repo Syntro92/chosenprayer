@@ -75,7 +75,7 @@ async function subscribe(start: Date) {
   channelIds.push(channelId);
 
   const provider = createStripeProvider(clockedStripe(clock.id));
-  const d = await startDonation(null, { channelHandle: handle, amount: 10, frequency: "monthly", donorEmail: email, idempotencyKey: randomUUID() }, { ip: `live-${tag}` }, db, provider);
+  const d = await startDonation(null, { channelHandle: handle, amount: 25, frequency: "monthly", donorEmail: email, idempotencyKey: randomUUID() }, { ip: `live-${tag}` }, db, provider);
   const row = (await getPool().query("select provider_payment_id p, provider_subscription_id s from public.donations where id = $1", [d.donationId])).rows[0];
   subscriptionIds.push(row.s);
   await stripe.paymentIntents.confirm(row.p, { payment_method: "pm_card_visa", return_url: "https://example.com/return" });
@@ -114,7 +114,7 @@ describe.skipIf(!live)("monthly renewals on Stripe test clocks", () => {
     await waitFor("2nd payment", async () => ((await donationsOf(sub)).length >= 2 ? true : null));
     const list = await donationsOf(sub);
     expect(list).toHaveLength(2);
-    expect(list[1]).toMatchObject({ status: "succeeded", amount_cents: 1000 });
+    expect(list[1]).toMatchObject({ status: "succeeded", amount_cents: 2500 });
     expect(list[1].fee_cents).toBeGreaterThan(0);
     const second = addMonths(start, 2, anchorDay);
     expect(day(await periodEnd(sub))).toBe(day(second));

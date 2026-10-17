@@ -1,6 +1,8 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- vendored canvas animation; its peep/stage objects are intentionally loose */
 import { gsap } from "gsap";
+import Link from "next/link";
 import React, { useEffect, useRef } from "react";
 
 interface CrowdCanvasProps {
@@ -66,7 +68,7 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
     };
 
     const normalWalk = ({ peep, props }: { peep: any; props: any }) => {
-      const { startX, startY, endX } = props;
+      const { startY, endX } = props;
       const xDuration = 10;
       const yDuration = 0.25;
 
@@ -276,6 +278,7 @@ const CrowdCanvas = ({ src, rows = 15, cols = 7 }: CrowdCanvasProps) => {
         if (peep.walk) peep.walk.kill();
       });
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the crowd is built once on mount
   }, []);
   return (
     <canvas ref={canvasRef} className="absolute bottom-0 h-[90vh] w-full opacity-[0.12]"
@@ -312,12 +315,12 @@ const Skiper39 = ({ coverUrl = null }: { coverUrl?: string | null }) => {
           you, give something back.
         </p>
         <div style={{ "--d": "480ms" } as React.CSSProperties} className="rise-in mt-10 flex flex-col gap-3 sm:flex-row">
-          <a
+          <Link
             href="/channels"
             className="inline-flex h-14 items-center justify-center rounded-xl bg-amber-400 px-8 text-base font-semibold text-neutral-900 shadow-sm transition hover:bg-amber-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-800 focus-visible:ring-offset-2"
           >
             Discover Channels
-          </a>
+          </Link>
           <a
             href="/community"
             className="inline-flex h-14 items-center justify-center rounded-xl border border-neutral-900/15 bg-white/50 px-8 text-base font-semibold text-neutral-800 backdrop-blur transition hover:bg-white/80 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-800 focus-visible:ring-offset-2"

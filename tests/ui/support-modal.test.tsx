@@ -45,7 +45,7 @@ const channel: Channel = {
   createdAt: "2025-01-01T00:00:00.000Z",
   cover: { tone: "sage", scene: "waves" },
 };
-const config: GivingConfig = { provider: "mock", testMode: true, publishableKey: null, available: true, recurring: true, minAmount: 5, maxAmount: 999_999 };
+const config: GivingConfig = { provider: "mock", testMode: true, publishableKey: null, available: true, recurring: true, minAmount: 25, maxAmount: 999_999 };
 const once25: Support = { frequency: "once", amount: 25, custom: "" };
 
 const ok = <T,>(data: T) => ({ ok: true as const, data });

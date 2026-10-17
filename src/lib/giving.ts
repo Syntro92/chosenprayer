@@ -1,7 +1,11 @@
 // Client-safe giving constants and helpers.
 
 /** Limits in WHOLE currency units, as the support form works in whole dollars. */
-export const GIVING_LIMITS = { minAmount: 5, maxAmount: 999_999 } as const;
+export const GIVING_LIMITS = { minAmount: 25, maxAmount: 999_999 } as const;
+
+/** Quick-pick amounts on the Support card when a channel hasn't set its own (at most MAX_PRESETS). */
+export const DEFAULT_GIVING_PRESETS: readonly number[] = [25, 55, 111, 555, 999];
+export const MAX_PRESETS = 5;
 
 export const DONATION_SOURCES = ["web", "mobile", "social", "email", "offline", "other"] as const;
 

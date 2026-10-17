@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CHANNEL_IMAGE_PATH_RE, HERO_IMAGE_PATH_RE } from "../channels";
+import { GIVING_LIMITS, MAX_PRESETS } from "../giving";
 import { displayNameField, emailField, passwordField } from "./accounts";
 
 // Admin API inputs. Validated again on the server; the Vue panel may reuse the shapes.
@@ -81,6 +82,25 @@ export const updateChannelSchema = z
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Nothing to update");
+
+/** Admin > Channels > Support settings: one set of values for the whole site. */
+export const givingSettingsSchema = z
+  .object({
+    minDonation: z.number({ message: "Enter a whole amount" }).int("Use a whole amount").min(1, "The minimum can't be below 1").max(GIVING_LIMITS.maxAmount, `At most ${GIVING_LIMITS.maxAmount.toLocaleString("en")}`),
+    presets: z
+      .array(
+        z.number({ message: "Use whole amounts" }).int("Use whole amounts").min(1, "Amounts must be at least 1").max(GIVING_LIMITS.maxAmount, `At most ${GIVING_LIMITS.maxAmount.toLocaleString("en")}`),
+      )
+      .min(1, "Pick at least one amount")
+      .max(MAX_PRESETS, `At most ${MAX_PRESETS} amounts`)
+      .transform((a) => [...new Set(a)].sort((x, y) => x - y)),
+    showTopSupporters: z.boolean(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.presets.some((n) => n < v.minDonation)) {
+      ctx.addIssue({ code: "custom", path: ["presets"], message: `Every amount must be at least ${v.minDonation} (the minimum donation)` });
+    }
+  });
 
 export const channelStatusSchema = z.object({
   status: z.enum(CHANNEL_STATUSES),

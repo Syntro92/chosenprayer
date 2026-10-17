@@ -59,6 +59,11 @@ export type Blessing = {
   amount?: number; // only present if the supporter chose to show it
 };
 
+export type TopSupporter = {
+  name: string; // "Anonymous" when the supporter has no name or chose privacy
+  total: number; // whole currency units given to this channel (succeeded donations only)
+};
+
 export type ChannelProfileData = {
   /** Link to the channel on YouTube ("View all content"); absent when none is linked. */
   youtubeUrl?: string;
@@ -70,6 +75,11 @@ export type ChannelProfileData = {
   blessingsCount: number;
   /** False when an admin turned blessings off for this channel (the page then hides them entirely). */
   showBlessings: boolean;
+  /** False when the site-wide Top Supporters list is switched off (the default); nothing is shown then. */
+  showTopSupporters: boolean;
+  topSupporters: TopSupporter[];
+  /** Quick-pick amounts on the Support card (site-wide, set in Admin > Channels > Support settings). */
+  givingPresets: number[];
 };
 
 const compact = new Intl.NumberFormat("en", {

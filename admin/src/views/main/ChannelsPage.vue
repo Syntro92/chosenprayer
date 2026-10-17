@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import ListPage from './ListPage.vue';
+import SupportSettingsCard from './SupportSettingsCard.vue';
 import { usePaged } from '@/utils/usePaged';
 import { label, money, statusColor } from '@/utils/format';
 
@@ -46,6 +47,7 @@ const statuses = ['pending', 'active', 'paused', 'archived'];
     @retry="reload"
     @row="(c: Channel) => router.push(`/channels/${c.id}`)"
   >
+    <template #above><SupportSettingsCard /></template>
     <template #filters>
       <v-row dense>
         <v-col cols="12" sm="6" md="4">

@@ -243,9 +243,9 @@ describe("Stripe webhook end to end (real signature check, real handler)", () =>
   it("a renewal stores its own receipt link and emails it", () =>
     withRollback(async (c) => {
       const ch = await channel(c);
-      const d = await begin(c, ch, { frequency: "monthly", amount: 10 });
+      const d = await begin(c, ch, { frequency: "monthly", amount: 25 });
       await hook(c, signed("payment_intent.succeeded", { id: d.pid }));
-      const invoice = { id: "in_r", billing_reason: "subscription_cycle", amount_paid: 1000, currency: "usd", parent: { subscription_details: { subscription: d.sub } }, lines: { data: [{ period: { end: 1_900_000_000 } }] } };
+      const invoice = { id: "in_r", billing_reason: "subscription_cycle", amount_paid: 2500, currency: "usd", parent: { subscription_details: { subscription: d.sub } }, lines: { data: [{ period: { end: 1_900_000_000 } }] } };
       await hook(c, signed("invoice.paid", invoice));
       const renewal = (await c.query("select receipt_url from public.donations where provider_payment_id = 'pi_renewal'")).rows[0];
       expect(renewal.receipt_url).toBe(RECEIPT);
@@ -327,17 +327,17 @@ describe("Stripe webhook end to end (real signature check, real handler)", () =>
   it("subscription lifecycle: first payment, renewal, failed renewal, cancellation", () =>
     withRollback(async (c) => {
       const ch = await channel(c);
-      const d = await begin(c, ch, { frequency: "monthly", amount: 10 });
+      const d = await begin(c, ch, { frequency: "monthly", amount: 25 });
       await hook(c, signed("payment_intent.succeeded", { id: d.pid, customer: "cus_x" }));
       const sub = (await c.query("select id, status, provider_subscription_id from public.subscriptions where provider_subscription_id = $1", [d.sub])).rows[0];
       expect(sub.status).toBe("active");
 
-      const invoice = { id: "in_r", billing_reason: "subscription_cycle", amount_paid: 1000, currency: "usd", parent: { subscription_details: { subscription: d.sub } }, lines: { data: [{ period: { end: 1_900_000_000 } }] } };
+      const invoice = { id: "in_r", billing_reason: "subscription_cycle", amount_paid: 2500, currency: "usd", parent: { subscription_details: { subscription: d.sub } }, lines: { data: [{ period: { end: 1_900_000_000 } }] } };
       await hook(c, signed("invoice.paid", invoice));
       const donations = (await c.query("select status, amount_cents, provider_payment_id from public.donations where subscription_id = $1 order by created_at", [sub.id])).rows;
       expect(donations).toHaveLength(2);
       // (rows created in one test transaction share a timestamp, so find the renewal by its payment id, not by position)
-      expect(donations.find((x) => x.provider_payment_id === "pi_renewal")).toMatchObject({ status: "succeeded", amount_cents: 1000 });
+      expect(donations.find((x) => x.provider_payment_id === "pi_renewal")).toMatchObject({ status: "succeeded", amount_cents: 2500 });
 
       await hook(c, signed("invoice.payment_failed", { ...invoice, id: "in_f" }));
       expect((await c.query("select status from public.subscriptions where id = $1", [sub.id])).rows[0].status).toBe("past_due");
@@ -351,7 +351,7 @@ describe("Stripe webhook end to end (real signature check, real handler)", () =>
       const me = await member(c);
       const ch = await channel(c);
       const fake = new FakeProvider();
-      const s = await startDonation(me, { channelHandle: ch.handle, amount: 10, frequency: "monthly", idempotencyKey: randomUUID() }, ctx(), c, fake);
+      const s = await startDonation(me, { channelHandle: ch.handle, amount: 25, frequency: "monthly", idempotencyKey: randomUUID() }, ctx(), c, fake);
       const row = (await c.query("select provider_payment_id p, provider_subscription_id sub from public.donations where id = $1", [s.donationId])).rows[0];
       await hook(c, signed("payment_intent.succeeded", { id: row.p }));
       const subId = (await c.query("select id from public.subscriptions where provider_subscription_id = $1", [row.sub])).rows[0].id;

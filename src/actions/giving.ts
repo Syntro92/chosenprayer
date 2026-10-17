@@ -14,6 +14,8 @@ import {
   cancelSubscriptionByToken,
   getDonationStatus,
   getGivingConfig,
+  refundByToken,
+  requestMyRefund,
   simulateMockPayment,
   startDonation,
 } from "@/server/services/giving";
@@ -71,7 +73,23 @@ export async function cancelSubscriptionAction(subscriptionId: string) {
   return action("cancelSubscription", async () => cancelMySubscription(await getActor(), subscriptionId));
 }
 
+/** "Request refund" on a gift in the account page: refunded at once to the original payment method. */
+export async function requestRefundAction(donationId: string) {
+  return action("requestRefund", async () => {
+    const { channelHandle } = await requestMyRefund(await getActor(), donationId);
+    refresh([channelHandle]);
+  });
+}
+
 /** The "Cancel monthly support" button in the payment email: the signed token is the authorization. */
 export async function cancelSubscriptionByTokenAction(token: string) {
   return action("cancelSubscriptionByToken", async () => cancelSubscriptionByToken(token));
+}
+
+/** The "Request a refund" button in the receipt email: the signed token is the authorization. */
+export async function refundByTokenAction(token: string) {
+  return action("refundByToken", async () => {
+    const { channelHandle } = await refundByToken(token);
+    refresh([channelHandle]);
+  });
 }

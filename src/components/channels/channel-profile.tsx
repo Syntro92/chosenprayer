@@ -11,7 +11,7 @@ import {
   mockPayAction,
   startDonationAction,
 } from "@/actions/giving";
-import { GIVING_LIMITS } from "@/lib/giving";
+import { DEFAULT_GIVING_PRESETS, GIVING_LIMITS } from "@/lib/giving";
 import type { GivingConfig } from "@/server/services/giving";
 import {
   formatDate,
@@ -20,6 +20,7 @@ import {
   type Channel,
   type ChannelProfileData,
   type Blessing,
+  type TopSupporter,
 } from "@/lib/channels";
 import { OriginButton } from "@/components/ui/origin-button";
 import { CoverArt, CoverPhoto, CrowdIllustration, TONE_CLASS } from "./illustrations";
@@ -35,7 +36,6 @@ const eyebrow =
 const h2 =
   "mt-3 text-3xl font-semibold leading-[1.1] tracking-tight text-charcoal-deep sm:text-4xl";
 
-const PRESETS = [5, 11, 25, 55, 111, 555, 999] as const;
 type Frequency = "once" | "monthly";
 type Amount = number | "custom";
 
@@ -93,12 +93,15 @@ export function SupportForm({
   onContinue,
   compact,
   config,
+  presets = DEFAULT_GIVING_PRESETS,
 }: {
   channel: Channel;
   value: Support;
   onChange: (next: Support) => void;
   onContinue: () => void;
   compact?: boolean;
+  /** Quick-pick amounts (site-wide, set by an admin). */
+  presets?: readonly number[];
   /** null while loading. Controls whether giving / monthly giving are currently switched on. */
   config: GivingConfig | null;
 }) {
@@ -163,9 +166,9 @@ export function SupportForm({
       <div
         role="radiogroup"
         aria-label="Amount"
-        className="mt-4 grid grid-cols-4 gap-2"
+        className="mt-4 grid grid-cols-3 gap-2"
       >
-        {PRESETS.map((n) => (
+        {presets.map((n) => (
           <button
             key={n}
             type="button"
@@ -253,6 +256,7 @@ export function SupportModal({
   blessingsEnabled = true,
   config,
   signedIn,
+  presets,
 }: {
   channel: Channel;
   value: Support;
@@ -263,6 +267,7 @@ export function SupportModal({
   blessingsEnabled?: boolean;
   config: GivingConfig | null;
   signedIn: boolean;
+  presets?: readonly number[];
 }) {
   const [step, setStep] = useState<Step>("choose");
   const [busy, setBusy] = useState(false);
@@ -463,7 +468,7 @@ export function SupportModal({
             <p className="mb-5 mt-2 text-sm leading-relaxed text-slate">
               Choose what feels right. Every amount is appreciated.
             </p>
-            <SupportForm channel={channel} value={value} onChange={onChange} onContinue={goConfirm} compact config={config} />
+            <SupportForm channel={channel} value={value} onChange={onChange} onContinue={goConfirm} compact config={config} presets={presets} />
           </>
         )}
 
@@ -763,6 +768,48 @@ function BlessingCard({ b }: { b: Blessing }) {
   );
 }
 
+/** Inside the Support card; only rendered when an admin switched Top Supporters on (site-wide). */
+function TopSupporters({ supporters }: { supporters: TopSupporter[] }) {
+  return (
+    <div className="mt-6 border-t border-line pt-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Top Supporters</p>
+      {supporters.length > 0 ? (
+        <ol className="mt-3 space-y-3">
+          {supporters.map((s, i) => {
+            const anon = s.name === "Anonymous";
+            return (
+              <li key={i} className="flex items-center gap-3">
+                <span
+                  aria-label={`Rank ${i + 1}`}
+                  className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                    i === 0 ? "bg-bless text-charcoal-deep" : "bg-mist text-slate"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <span
+                  aria-hidden
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                    anon ? "bg-mist text-slate" : "bg-cream text-charcoal-deep"
+                  }`}
+                >
+                  {anon ? "·" : s.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-charcoal-deep">{s.name}</span>
+                <span className="rounded-full bg-cream px-2.5 py-0.5 text-xs font-semibold text-charcoal-deep">
+                  {money(s.total)}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="mt-3 text-sm text-slate">No supporters yet. Be the first to give.</p>
+      )}
+    </div>
+  );
+}
+
 /** Thumbnail with a play button; loads the player only after a click. */
 function YouTubeEmbed({ id, title }: { id: string; title: string }) {
   const [playing, setPlaying] = useState(false);
@@ -815,9 +862,10 @@ export function ChannelProfile({
   channel: Channel;
   data: ChannelProfileData;
 }) {
+  const presets = data.givingPresets;
   const [support, setSupport] = useState<Support>({
     frequency: "once",
-    amount: 25,
+    amount: presets.includes(25) ? 25 : presets[0],
     custom: "",
   });
   const [open, setOpen] = useState(false);
@@ -929,8 +977,36 @@ export function ChannelProfile({
 
   return (
     <div>
+      {/* Mobile: the support card comes first, under a compact channel header */}
+      <section className="mx-auto w-full max-w-xl px-4 pb-2 pt-24 sm:px-6 lg:hidden">
+        <div className="flex items-center gap-4">
+          <Avatar name={channel.name} url={channel.avatarUrl} className="size-16 text-2xl" />
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-charcoal-deep">{channel.name}</h1>
+            <p className="truncate text-sm text-slate">
+              @{channel.handle}
+              {channel.subscribers != null && <> · {formatFollowers(channel.subscribers)} subscribers</>}
+            </p>
+          </div>
+        </div>
+        <div
+          ref={mobileSupportRef}
+          className={`${card} mt-5 p-6 shadow-[0_12px_32px_-18px_rgba(23,25,24,0.25)]`}
+        >
+          <SupportForm
+            channel={channel}
+            value={support}
+            onChange={setSupport}
+            onContinue={openSupport}
+            config={config}
+            presets={presets}
+          />
+          {data.showTopSupporters && <TopSupporters supporters={data.topSupporters} />}
+        </div>
+      </section>
+
       {/* Cover */}
-      <div className="mx-auto w-full max-w-6xl px-4 pt-24 sm:px-6 lg:px-10">
+      <div className="mx-auto hidden w-full max-w-6xl px-4 pt-24 sm:px-6 lg:block lg:px-10">
         <div
           className={`relative h-44 overflow-hidden rounded-[22px] bg-gradient-to-br sm:h-60 lg:h-72 lg:rounded-[28px] ${TONE_CLASS[channel.cover.tone]}`}
         >
@@ -943,7 +1019,8 @@ export function ChannelProfile({
         {/* ----- Main column ----- */}
         <div className="min-w-0">
           {/* Identity */}
-          <header className="px-1 sm:px-4">
+          <header className="px-1 max-lg:mt-10 sm:px-4">
+            <div className="hidden lg:block">
             <Avatar
               name={channel.name}
               url={channel.avatarUrl}
@@ -966,7 +1043,8 @@ export function ChannelProfile({
               )}
             </div>
             <p className="mt-1 text-slate">@{channel.handle}</p>
-            <p className="mt-4 max-w-xl text-lg leading-relaxed text-charcoal-deep/85">
+            </div>
+            <p className="max-w-xl text-lg leading-relaxed text-charcoal-deep/85 lg:mt-4">
               {channel.description}
             </p>
 
@@ -1032,20 +1110,6 @@ export function ChannelProfile({
               </p>
             )}
           </header>
-
-          {/* Inline support card (mobile), above About */}
-          <div
-            ref={mobileSupportRef}
-            className={`${card} mt-10 p-6 shadow-[0_12px_32px_-18px_rgba(23,25,24,0.25)] lg:hidden`}
-          >
-            <SupportForm
-              channel={channel}
-              value={support}
-              onChange={setSupport}
-              onContinue={openSupport}
-              config={config}
-            />
-          </div>
 
           <TabBar showBlessings={data.showBlessings} />
 
@@ -1193,7 +1257,9 @@ export function ChannelProfile({
                 onChange={setSupport}
                 onContinue={openSupport}
               config={config}
+                presets={presets}
               />
+              {data.showTopSupporters && <TopSupporters supporters={data.topSupporters} />}
             </div>
           </div>
         </aside>
@@ -1260,6 +1326,7 @@ export function ChannelProfile({
           onBlessing={addBlessing}
           blessingsEnabled={data.showBlessings}
           config={config}
+          presets={presets}
           signedIn={follow.signedIn}
         />
       )}

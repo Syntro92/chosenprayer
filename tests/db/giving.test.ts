@@ -6,6 +6,9 @@ import type { PaymentEvent } from "@/server/providers/payments";
 import { createBlessing } from "@/server/services/blessings";
 import {
   adminRefund,
+  refundByToken,
+  getDonationForRefund,
+  requestMyRefund,
   cancelMySubscription,
   cancelSubscriptionByToken,
   getSubscriptionForCancel,
@@ -56,7 +59,7 @@ const outbox = async (c: Queryable, to?: string) =>
 /* ======================================================================== */
 describe("getGivingConfig", () => {
   it("reports test mode and the limits", async () => {
-    expect(await getGivingConfig()).toMatchObject({ provider: "mock", available: true, recurring: true, minAmount: 5, maxAmount: 999_999 });
+    expect(await getGivingConfig()).toMatchObject({ provider: "mock", available: true, recurring: true, minAmount: 25, maxAmount: 999_999 });
   });
 });
 
@@ -108,7 +111,7 @@ describe("startDonation", () => {
       await expect(bad({ idempotencyKey: "short" })).rejects.toMatchObject({ name: "ZodError" });
       await expect(start(c, null, { handle: "no_such_channel_zz" })).rejects.toMatchObject({ code: "NOT_FOUND" });
       expect((await start(c, null, ch, { amount: 999999 })).amountCents).toBe(99_999_900);
-      expect((await start(c, null, ch, { amount: 5 })).amountCents).toBe(500);
+      expect((await start(c, null, ch, { amount: 25 })).amountCents).toBe(2500);
     }));
 
   it("only works for active channels", () =>
@@ -291,19 +294,19 @@ describe("handlePaymentEvent: monthly gifts", () => {
     withRollback(async (c) => {
       const me = await member(c);
       const ch = await channel(c);
-      const { donationId } = await paid(c, me, ch, { frequency: "monthly", amount: 11 });
+      const { donationId } = await paid(c, me, ch, { frequency: "monthly", amount: 25 });
       const sub = (await c.query("select s.status, s.amount_cents, s.donor_id, s.current_period_end > now() + interval '27 days' as period_ok, d.subscription_id = s.id as linked from public.subscriptions s join public.donations d on d.subscription_id = s.id where d.id = $1", [donationId])).rows[0];
-      expect(sub).toMatchObject({ status: "active", amount_cents: 1100, donor_id: me.userId, period_ok: true, linked: true });
-      expect((await listMySubscriptions(me, c))[0]).toMatchObject({ status: "active", amountCents: 1100, channel: { handle: ch.handle } });
+      expect(sub).toMatchObject({ status: "active", amount_cents: 2500, donor_id: me.userId, period_ok: true, linked: true });
+      expect((await listMySubscriptions(me, c))[0]).toMatchObject({ status: "active", amountCents: 2500, channel: { handle: ch.handle } });
     }));
 
   it("each later cycle becomes its own donation, exactly once", () =>
     withRollback(async (c) => {
       const ch = await channel(c);
-      const { donationId } = await paid(c, null, ch, { frequency: "monthly", amount: 10, donorEmail: "monthly@example.com" });
+      const { donationId } = await paid(c, null, ch, { frequency: "monthly", amount: 25, donorEmail: "monthly@example.com" });
       const subRef = await subOf(c, donationId);
       const renew = (payId: string, eventId = randomUUID()): PaymentEvent => ({
-        type: "subscription.renewed", eventId, providerSubscriptionId: subRef, providerPaymentId: payId, amountCents: 1000, currency: "USD", feeCents: 59,
+        type: "subscription.renewed", eventId, providerSubscriptionId: subRef, providerPaymentId: payId, amountCents: 2500, currency: "USD", feeCents: 59,
       });
       const first = renew("pi_cycle_2");
       expect((await handle(c, first)).channelHandles).toEqual([ch.handle]);
@@ -312,7 +315,7 @@ describe("handlePaymentEvent: monthly gifts", () => {
       expect((await c.query("select count(*)::int n from public.donations where subscription_id is not null and status = 'succeeded'")).rows[0].n).toBeGreaterThanOrEqual(2);
       const cycles = (await c.query("select count(*)::int n from public.donations where provider_subscription_id = $1 and status = 'succeeded'", [subRef])).rows[0].n;
       expect(cycles).toBe(2);
-      expect((await c.query("select total_raised_cents from public.channels where id = $1", [ch.id])).rows[0].total_raised_cents).toBe(2000);
+      expect((await c.query("select total_raised_cents from public.channels where id = $1", [ch.id])).rows[0].total_raised_cents).toBe(5000);
       expect((await outbox(c, "monthly@example.com")).filter((m) => m.template === "donation_receipt")).toHaveLength(2);
     }));
 
@@ -443,15 +446,15 @@ describe("listMyDonations / listMySubscriptions", () => {
       const me = await member(c);
       const other = await member(c);
       const ch = await channel(c, { name: "Mine Channel" });
-      const a = await paid(c, me, ch, { amount: 10 });
-      const b = await paid(c, me, ch, { amount: 20 });
+      const a = await paid(c, me, ch, { amount: 25 });
+      const b = await paid(c, me, ch, { amount: 30 });
       await start(c, me, ch); // pending: not listed
       await paid(c, other, ch);
       await c.query("update public.donations set created_at = now() - interval '2 days' where id = $1", [a.donationId]);
 
       const page = await listMyDonations(me, {}, c);
       expect(page.items.map((i) => i.id)).toEqual([b.donationId, a.donationId]);
-      expect(page.items[0]).toMatchObject({ status: "succeeded", amountCents: 2000, channel: { handle: ch.handle, name: "Mine Channel" } });
+      expect(page.items[0]).toMatchObject({ status: "succeeded", amountCents: 3000, channel: { handle: ch.handle, name: "Mine Channel" } });
       const p1 = await listMyDonations(me, { limit: 1 }, c);
       expect(p1.nextCursor).not.toBeNull();
       expect((await listMyDonations(me, { limit: 1, cursor: p1.nextCursor! }, c)).items.map((i) => i.id)).toEqual([a.donationId]);
@@ -578,6 +581,74 @@ describe("adminRefund", () => {
     }));
 });
 
+describe("requestMyRefund", () => {
+  it("refunds the donor's own gift at the provider, emails and audits", () =>
+    withRollback(async (c) => {
+      const donor = await member(c);
+      const ch = await channel(c);
+      const prov = new FakeProvider();
+      const g = await paid(c, donor, ch, {}, prov);
+
+      expect(await requestMyRefund(donor, g.donationId, c, prov)).toEqual({ channelHandle: ch.handle });
+      expect(prov.refunded).toEqual([g.pid]);
+      expect((await c.query("select status from public.donations where id = $1", [g.donationId])).rows[0].status).toBe("refunded");
+      const log = (await c.query("select actor_id, action, metadata from public.audit_log where entity_id = $1", [g.donationId])).rows;
+      expect(log[0]).toMatchObject({ actor_id: donor.userId, action: "donation.refund" });
+      expect(log[0].metadata).toMatchObject({ requestedBy: "donor" });
+      await expect(requestMyRefund(donor, g.donationId, c, prov)).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(prov.refunded).toHaveLength(1);
+    }));
+
+  it("only works for your own completed gift", () =>
+    withRollback(async (c) => {
+      const donor = await member(c);
+      const ch = await channel(c);
+      const prov = new FakeProvider();
+      const mine = await paid(c, donor, ch, {}, prov);
+      const guest = await paid(c, null, ch, {}, prov);
+      const pending = await start(c, donor, ch, {}, prov);
+
+      await expect(requestMyRefund(null, mine.donationId, c, prov)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
+      await expect(requestMyRefund(await member(c), mine.donationId, c, prov)).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(requestMyRefund(donor, guest.donationId, c, prov)).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(requestMyRefund(donor, pending.donationId, c, prov)).rejects.toMatchObject({ code: "CONFLICT" });
+      await expect(requestMyRefund(donor, "nope", c, prov)).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(prov.refunded).toHaveLength(0);
+    }));
+});
+
+describe("refund by email link", () => {
+  it("lets a guest refund from the receipt link, once, and rejects bad tokens", () =>
+    withRollback(async (c) => {
+      const ch = await channel(c);
+      const prov = new FakeProvider();
+      const g = await paid(c, null, ch, { donorEmail: "guest-refund@example.com" }, prov);
+
+      const receipt = (await outbox(c, "guest-refund@example.com")).find((m) => m.template === "donation_receipt")!;
+      const url = receipt.payload.refundUrl as string;
+      expect(url).toContain("/donation/refund?token=");
+      const token = new URL(url).searchParams.get("token")!;
+      expect(token.startsWith(g.donationId)).toBe(true);
+
+      expect(await getDonationForRefund(token, c)).toMatchObject({ status: "succeeded", amountCents: 2500 });
+      for (const bad of [undefined, "", "junk", `${g.donationId}.AAAA`, `${randomUUID()}.${token.split(".")[1]}`]) {
+        await expect(refundByToken(bad, c, prov)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(await getDonationForRefund(bad, c)).toBeNull();
+      }
+      expect(prov.refunded).toHaveLength(0);
+
+      expect(await refundByToken(token, c, prov)).toEqual({ channelHandle: ch.handle });
+      expect(prov.refunded).toEqual([g.pid]);
+      expect((await getDonationForRefund(token, c))!.status).toBe("refunded");
+      expect((await outbox(c, "guest-refund@example.com")).map((m) => m.template)).toContain("donation_refunded");
+      await expect(refundByToken(token, c, prov)).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(prov.refunded).toHaveLength(1);
+      const log = (await c.query("select actor_id, metadata from public.audit_log where entity_id = $1", [g.donationId])).rows;
+      expect(log[0].actor_id).toBeNull();
+      expect(log[0].metadata).toMatchObject({ requestedBy: "donor", via: "email" });
+    }));
+});
+
 describe("sweepStaleDonations", () => {
   it("closes abandoned checkouts older than a day and nothing else", () =>
     withRollback(async (c) => {
@@ -639,6 +710,47 @@ describe("blessings", () => {
       expect((await getChannelProfile(ch.handle, c)).data).toMatchObject({ showBlessings: true, blessingsCount: 1 });
       expect((await getChannelProfile(ch.handle, c)).data.blessings[0].message).toBe("Before it was switched off");
       await createBlessing(null, { donationId: second.donationId, token: second.token, message: "Now it works" }, c);
+    }));
+
+  it("top supporters: off by default, then ranked by total given, merging a person's gifts, masking anonymous donors and dropping refunds", () =>
+    withRollback(async (c) => {
+      await c.query("update public.site_settings set show_top_supporters = default where id", []);
+      const ch = await channel(c, { name: "Ranked Channel" });
+      const sarah = await member(c, { name: "Sarah Supporter" });
+      await paid(c, sarah, ch, { amount: 30 });
+      await paid(c, sarah, ch, { amount: 40 }); // same member: 70 in total
+      await paid(c, null, ch, { amount: 50, donorEmail: "guest@example.com", donorName: "Guest Gary" });
+      const shy = await paid(c, null, ch, { amount: 200, donorEmail: "shy@example.com", donorName: "Shy Sam" });
+      await createBlessing(null, { donationId: shy.donationId, token: shy.token, message: "Quietly", anonymous: true }, c);
+      const refunded = await paid(c, null, ch, { amount: 900, donorEmail: "gone@example.com", donorName: "Refunded Rae" });
+      await handle(c, { type: "payment.refunded", eventId: randomUUID(), providerPaymentId: refunded.pid } as PaymentEvent);
+      await paid(c, null, ch, { amount: 25, donorEmail: "noname@example.com" }); // gave no name
+
+      // Off until an admin switches it on: nothing is exposed.
+      const off = (await getChannelProfile(ch.handle, c)).data;
+      expect(off).toMatchObject({ showTopSupporters: false, topSupporters: [] });
+
+      await c.query("update public.site_settings set show_top_supporters = true where id", []);
+      const { data } = await getChannelProfile(ch.handle, c);
+      expect(data.showTopSupporters).toBe(true);
+      expect(data.topSupporters.map((s) => s.total)).toEqual([200, 70, 50, 25]);
+      expect(data.topSupporters[0].name).toBe("Anonymous"); // chose privacy, despite giving a name
+      expect(data.topSupporters[1].name).toBe("Sarah Supporter");
+      expect(data.topSupporters[2].name).toBe("Guest Gary");
+      expect(data.topSupporters[3].name).toBe("Anonymous"); // never gave a name
+      const json = JSON.stringify(data.topSupporters);
+      for (const secret of ["Shy Sam", "Refunded Rae", "example.com"]) expect(json).not.toContain(secret);
+      // Only name and total are public.
+      expect(Object.keys(data.topSupporters[0]).sort()).toEqual(["name", "total"]);
+    }));
+
+  it("top supporters shows at most five", () =>
+    withRollback(async (c) => {
+      const ch = await channel(c, { name: "Crowded Channel" });
+      for (let i = 1; i <= 7; i++) await paid(c, null, ch, { amount: 25 * i, donorEmail: `p${i}@example.com`, donorName: `Person ${i}` });
+      await c.query("update public.site_settings set show_top_supporters = true where id", []);
+      const { data } = await getChannelProfile(ch.handle, c);
+      expect(data.topSupporters.map((s) => s.name)).toEqual(["Person 7", "Person 6", "Person 5", "Person 4", "Person 3"]);
     }));
 
   it("anonymous hides the name everywhere, including from the owner's notification", () =>

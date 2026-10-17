@@ -22,3 +22,24 @@ export function verifyCancelToken(token: string | undefined): string | null {
   const b = Buffer.from(sign(id));
   return a.length === b.length && timingSafeEqual(a, b) ? id : null;
 }
+
+// Same idea for refunds: the receipt email carries a signed link to a confirm page, so guests (no
+// account) can ask for their money back. The link only identifies the donation; the refund is a
+// button press on the page, never a GET. The signature domain differs, so a cancel token can't be
+// replayed as a refund token (or the other way round).
+
+const signRefund = (donationId: string) =>
+  createHmac("sha256", getEnv().CRON_SECRET).update(`donation-refund:${donationId}`).digest("base64url");
+
+export function donationRefundUrl(donationId: string): string {
+  return `${getEnv().APP_URL}/donation/refund?token=${donationId}.${signRefund(donationId)}`;
+}
+
+/** Returns the donation id if the token is genuine, otherwise null. */
+export function verifyRefundToken(token: string | undefined): string | null {
+  const [id, sig, extra] = (token ?? "").split(".");
+  if (!id || !sig || extra !== undefined || !UUID_RE.test(id)) return null;
+  const a = Buffer.from(sig);
+  const b = Buffer.from(signRefund(id));
+  return a.length === b.length && timingSafeEqual(a, b) ? id : null;
+}

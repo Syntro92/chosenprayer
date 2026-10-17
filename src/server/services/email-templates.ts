@@ -68,6 +68,7 @@ export function renderEmail(template: string, payload: Record<string, unknown>):
       const ref = str(payload.donationId).slice(0, 8).toUpperCase();
       const receiptUrl = safeReceiptUrl(payload.receiptUrl);
       const cancelUrl = monthly && /^https?:\/\//.test(str(payload.cancelUrl)) ? str(payload.cancelUrl) : "";
+      const refundUrl = /^https?:\/\//.test(str(payload.refundUrl)) ? str(payload.refundUrl) : "";
       const lines = [
         ["Channel", channel],
         ["Amount", `${amount}${monthly ? " / month" : ""}`],
@@ -83,6 +84,7 @@ export function renderEmail(template: string, payload: Record<string, unknown>):
           "",
           ...(receiptUrl ? [`Download your receipt: ${receiptUrl}`, ""] : []),
           ...(cancelUrl ? [`Cancel monthly support: ${cancelUrl}`, ""] : []),
+          ...(refundUrl ? [`Changed your mind? Request a refund (it goes back to the card you paid with): ${refundUrl}`, ""] : []),
           monthly ? "Your monthly support continues until you cancel it." : "This was a one-time contribution.",
           "Your contribution is voluntary and is a record of your support, not a tax document.",
         ].join("\n"),
@@ -98,6 +100,7 @@ export function renderEmail(template: string, payload: Record<string, unknown>):
             .join("")}</table>
 ${receiptUrl ? button(receiptUrl, "Download Stripe receipt") : ""}
 ${cancelUrl ? outlineButton(cancelUrl, "Cancel monthly support") : ""}
+${refundUrl ? note(`Changed your mind? You can <a href="${escapeHtml(refundUrl)}" style="color:${C.ink};font-weight:600">request a refund</a> and it goes back to the card you paid with.`) : ""}
 ${note(`${monthly ? "Your monthly support continues until you cancel it." :"This was a one-time contribution."} Your contribution is voluntary and is a record of your support, not a tax document.`)}`,
           `${amount} to ${channel}`,
         ),

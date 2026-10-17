@@ -396,6 +396,7 @@ describe("listAuditLog", () => {
       const admin = await member(c, { role: "admin", name: "The Admin" });
       const mod = await member(c, { role: "admin" });
       const author = await member(c);
+      const nonAdmin = await member(c); // the moderator role is gone: only admins may read the audit log
       const p1 = await rawPost(c, author.userId, "one");
       const p2 = await rawPost(c, author.userId, "two");
       await removePost(mod, p1, { reason: "r1" }, c);
@@ -417,7 +418,7 @@ describe("listAuditLog", () => {
       const p2nd = await listAuditLog(admin, { limit: 1, cursor: p.nextCursor! }, c);
       expect(p2nd.items[0].id).toBeLessThan(p.items[0].id);
 
-      await expect(listAuditLog(mod, {}, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(listAuditLog(nonAdmin, {}, c)).rejects.toMatchObject({ code: "FORBIDDEN" });
       await expect(listAuditLog(null, {}, c)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
       await expect(listAuditLog(admin, { cursor: encodeBad() }, c)).rejects.toMatchObject({ code: "VALIDATION" });
     }));
@@ -428,6 +429,7 @@ const encodeBad = () => Buffer.from(JSON.stringify({ k: "text", id: "1" })).toSt
 describe("pinPost", () => {
   it("admin pins and unpins; the pinned post leads page one of the feed once, then returns to its place; audited", () =>
     withRollback(async (c) => {
+      await c.query("update public.posts set pinned_at = null, pinned_by = null where pinned_at is not null", []); // real pins would lead the feed
       const admin = await member(c, { role: "admin", name: "Ada" });
       const author = await member(c);
       const older = await rawPost(c, author.userId, "older post");
@@ -456,8 +458,9 @@ describe("pinPost", () => {
 
   it("is admin-only, validates input, ignores no-ops and caps at three", () =>
     withRollback(async (c) => {
+      await c.query("update public.posts set pinned_at = null, pinned_by = null where pinned_at is not null", []); // real pins would eat into the cap
       const admin = await member(c, { role: "admin" });
-      const mod = await member(c, { role: "admin" });
+      const mod = await member(c); // the moderator role is gone: a plain member is refused too
       const m = await member(c);
       const post = await rawPost(c, m.userId);
       await expect(pinPost(null, post, { pinned: true }, c)).rejects.toMatchObject({ code: "UNAUTHENTICATED" });
@@ -470,7 +473,7 @@ describe("pinPost", () => {
       await pinPost(admin, post, { pinned: true }, c);
       await pinPost(admin, post, { pinned: true }, c); // no-op, no second audit row
       const log = await listAuditLog(admin, { entityType: "post" }, c);
-      expect(log.items.filter((i) => i.action === "post.pin")).toHaveLength(1);
+      expect(log.items.filter((i) => i.action === "post.pin" && i.entityId === post)).toHaveLength(1);
 
       const two = await rawPost(c, m.userId);
       const three = await rawPost(c, m.userId);

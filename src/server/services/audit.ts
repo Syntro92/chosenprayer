@@ -28,7 +28,7 @@ export type AuditAction =
  */
 export async function audit(
   conn: Queryable,
-  entry: { actorId: string; action: AuditAction; entityType: "post" | "comment" | "report" | "user" | "donation" | "channel" | "setting"; entityId: string; metadata?: Record<string, unknown> },
+  entry: { actorId: string | null; action: AuditAction; entityType: "post" | "comment" | "report" | "user" | "donation" | "channel" | "setting"; entityId: string; metadata?: Record<string, unknown> },
 ): Promise<void> {
   await conn.query(
     "insert into public.audit_log (actor_id, action, entity_type, entity_id, metadata) values ($1, $2, $3, $4, $5)",
