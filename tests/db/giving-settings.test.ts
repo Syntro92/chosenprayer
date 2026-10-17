@@ -15,9 +15,9 @@ afterAll(async () => {
 
 // The real database may hold settings an admin has edited; start every test from the column defaults.
 const resetSettings = (c: Queryable) =>
-  c.query("update public.site_settings set min_donation = default, giving_presets = default, show_top_supporters = default where id", []);
+  c.query("update public.site_settings set min_donation = default, giving_presets = default, show_top_supporters = default, show_recent_supporters = default where id", []);
 const admin = (c: Queryable) => member(c, { role: "admin", name: "Ada Admin" });
-const settings = (over: Record<string, unknown> = {}) => ({ minDonation: 25, presets: [25, 55, 111], showTopSupporters: false, ...over });
+const settings = (over: Record<string, unknown> = {}) => ({ minDonation: 25, presets: [25, 55, 111], showTopSupporters: false, showRecentSupporters: true, ...over });
 async function invalid(p: Promise<unknown>) {
   try {
     await p;
@@ -31,7 +31,7 @@ describe("site-wide support settings", () => {
   it("start with the original defaults", () =>
     withRollback(async (c) => {
       await resetSettings(c);
-      expect(await readGivingSettings(c)).toEqual({ minDonation: 25, presets: [25, 55, 111, 555, 999], showTopSupporters: false });
+      expect(await readGivingSettings(c)).toEqual({ minDonation: 25, presets: [25, 55, 111, 555, 999], showTopSupporters: false, showRecentSupporters: true });
     }));
 
   it("are admin-only", () =>
@@ -46,7 +46,7 @@ describe("site-wide support settings", () => {
     withRollback(async (c) => {
       const a = await admin(c);
       const out = await updateGivingSettings(a, settings({ minDonation: 10, presets: [100, 50, 50, 10], showTopSupporters: true }), c);
-      expect(out).toEqual({ minDonation: 10, presets: [10, 50, 100], showTopSupporters: true });
+      expect(out).toEqual({ minDonation: 10, presets: [10, 50, 100], showTopSupporters: true, showRecentSupporters: true });
       expect(await getGivingSettings(a, c)).toEqual(out);
       const log = await listAuditLog(a, { entityType: "setting" }, c);
       expect(log.items.some((i) => i.action === "setting.update" && (i.metadata.fields as string[]).includes("presets"))).toBe(true);
@@ -54,13 +54,15 @@ describe("site-wide support settings", () => {
 
   it.each([
     ["no amounts", { presets: [] }],
-    ["more than five amounts", { presets: [25, 30, 35, 40, 45, 50] }],
+    ["more than nine amounts", { presets: [25, 30, 35, 40, 45, 50, 55, 60, 65, 70] }],
     ["a fraction", { presets: [25.5] }],
     ["not a number", { presets: ["x"] }],
     ["an amount below the minimum donation", { minDonation: 50, presets: [25, 100] }],
     ["a zero minimum", { minDonation: 0, presets: [25] }],
     ["a huge minimum", { minDonation: 1_000_000, presets: [25] }],
     ["a non-boolean switch", { showTopSupporters: "yes" }],
+    ["a non-boolean recent switch", { showRecentSupporters: "yes" }],
+    ["a missing recent switch", { showRecentSupporters: undefined }],
   ])("reject %s", (_name, bad) =>
     withRollback(async (c) => {
       await resetSettings(c);

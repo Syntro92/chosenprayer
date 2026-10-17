@@ -181,7 +181,7 @@ export function GivingSection({ donations, subscriptions }: { donations: MyDonat
                           Receipt
                         </a>
                       )}
-                      {d.status === "succeeded" && <RefundControl id={d.id} />}
+                      {d.refundable && <RefundControl id={d.id} />}
                     </span>
                   </li>
                 ))}

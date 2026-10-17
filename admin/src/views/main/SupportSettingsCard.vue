@@ -8,12 +8,13 @@ interface GivingSettings {
   minDonation: number;
   presets: number[];
   showTopSupporters: boolean;
+  showRecentSupporters: boolean;
 }
 
 const SUGGESTED = [10, 25, 50, 55, 100, 111, 250, 500, 555, 999, 1000];
-const MAX_PRESETS = 5;
+const MAX_PRESETS = 9;
 
-const form = ref<GivingSettings>({ minDonation: 25, presets: [], showTopSupporters: false });
+const form = ref<GivingSettings>({ minDonation: 25, presets: [], showTopSupporters: false, showRecentSupporters: true });
 const minText = ref('25');
 const loading = ref(true);
 const saving = ref(false);
@@ -33,7 +34,12 @@ const presetError = computed(() => fieldErrors.value.presets ?? Object.entries(f
 const tooLow = computed(() => form.value.presets.filter((n) => n < Number(minText.value)));
 
 function apply(s: GivingSettings) {
-  form.value = { minDonation: s.minDonation, presets: [...s.presets], showTopSupporters: s.showTopSupporters };
+  form.value = {
+    minDonation: s.minDonation,
+    presets: [...s.presets],
+    showTopSupporters: s.showTopSupporters,
+    showRecentSupporters: s.showRecentSupporters
+  };
   minText.value = String(s.minDonation);
 }
 
@@ -107,6 +113,15 @@ async function save(e: Event) {
         v-model="form.showTopSupporters"
         label="Show Top Supporters on channel pages"
         hint="Lists each channel's top 5 supporters by total given. Supporters with no name, or who chose to stay anonymous, appear as Anonymous."
+        persistent-hint
+        color="primary"
+        density="compact"
+        class="mb-4"
+      />
+      <v-switch
+        v-model="form.showRecentSupporters"
+        label="Show Recent Supporters on channel pages"
+        hint="Lists each channel's latest gifts with how long ago they were made. Supporters with no name, or who chose to stay anonymous, appear as Anonymous."
         persistent-hint
         color="primary"
         density="compact"

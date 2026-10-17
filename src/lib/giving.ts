@@ -3,9 +3,12 @@
 /** Limits in WHOLE currency units, as the support form works in whole dollars. */
 export const GIVING_LIMITS = { minAmount: 25, maxAmount: 999_999 } as const;
 
+/** Donors can refund a gift themselves for this many days after it was paid (admins have no limit). */
+export const REFUND_WINDOW_DAYS = 7;
+
 /** Quick-pick amounts on the Support card when a channel hasn't set its own (at most MAX_PRESETS). */
 export const DEFAULT_GIVING_PRESETS: readonly number[] = [25, 55, 111, 555, 999];
-export const MAX_PRESETS = 5;
+export const MAX_PRESETS = 9;
 
 export const DONATION_SOURCES = ["web", "mobile", "social", "email", "offline", "other"] as const;
 

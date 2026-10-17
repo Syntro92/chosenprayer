@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { formatMoney, safeReceiptUrl, GIVING_LIMITS } from "@/lib/giving";
+import { formatMoney, safeReceiptUrl, GIVING_LIMITS, REFUND_WINDOW_DAYS } from "@/lib/giving";
 import { donationLookupSchema, startDonationSchema } from "@/lib/schemas/giving";
 import { uuidSchema } from "@/lib/schemas/community";
 import { hasRole, requireMember, requireRole, type Actor } from "../auth/policy";
@@ -572,6 +572,8 @@ export interface MyDonation {
   channel: { handle: string; name: string };
   /** Provider-hosted receipt page (Stripe), when there is one. */
   receiptUrl: string | null;
+  /** True while the donor can still refund it themselves (paid and inside the refund window). */
+  refundable: boolean;
 }
 
 /** The signed-in member's own giving history, newest first. */
@@ -595,9 +597,10 @@ export async function listMyDonations(
   params.push(limit + 1);
   const fetched = await rows<{
     id: string; status: DonationRow["status"]; amount_cents: number; currency: string; frequency: "once" | "monthly";
-    created_raw: string; handle: string; name: string; receipt_url: string | null;
+    created_raw: string; handle: string; name: string; receipt_url: string | null; refundable: boolean;
   }>(
     `select d.id, d.status, d.amount_cents, d.currency, d.frequency, d.receipt_url,
+            (d.status = 'succeeded' and coalesce(d.paid_at, d.created_at) > now() - make_interval(days => ${REFUND_WINDOW_DAYS})) as refundable,
             to_char(d.created_at at time zone 'UTC', ${ISO_US}) as created_raw, c.handle::text as handle, c.name
      from public.donations d join public.channels c on c.id = d.channel_id
      where d.donor_id = $1 and d.status in ('succeeded', 'refunded') ${after}
@@ -617,6 +620,7 @@ export async function listMyDonations(
       createdAt: r.created_raw,
       channel: { handle: r.handle, name: r.name },
       receiptUrl: safeReceiptUrl(r.receipt_url),
+      refundable: r.refundable,
     })),
   };
 }
@@ -780,16 +784,17 @@ export async function refundByToken(
 export async function getDonationForRefund(
   token: string | undefined,
   conn: Queryable = db,
-): Promise<{ channelName: string; amountCents: number; currency: string; status: DonationRow["status"] } | null> {
+): Promise<{ channelName: string; amountCents: number; currency: string; status: DonationRow["status"]; expired: boolean } | null> {
   const id = verifyRefundToken(token);
   if (!id) return null;
-  const d = await one<{ status: DonationRow["status"]; amount_cents: number; currency: string; channel_name: string }>(
-    `select d.status, d.amount_cents, d.currency, c.name as channel_name
+  const d = await one<{ status: DonationRow["status"]; amount_cents: number; currency: string; channel_name: string; expired: boolean }>(
+    `select d.status, d.amount_cents, d.currency, c.name as channel_name,
+            coalesce(d.paid_at, d.created_at) <= now() - make_interval(days => $2) as expired
      from public.donations d join public.channels c on c.id = d.channel_id where d.id = $1`,
-    [id],
+    [id, REFUND_WINDOW_DAYS],
     conn,
   );
-  return d ? { channelName: d.channel_name, amountCents: d.amount_cents, currency: d.currency, status: d.status } : null;
+  return d ? { channelName: d.channel_name, amountCents: d.amount_cents, currency: d.currency, status: d.status, expired: d.expired } : null;
 }
 
 /**
@@ -812,6 +817,14 @@ async function refundDonation(
     if (!d || (donorId !== null && d.donor_id !== donorId)) throw new AppError("NOT_FOUND", "Donation not found.");
     if (d.status === "refunded") throw new AppError("CONFLICT", "That donation has already been refunded.");
     if (d.status !== "succeeded" || !d.provider_payment_id) throw new AppError("CONFLICT", "Only completed donations can be refunded.");
+    if (!isAdmin) {
+      const w = await one<{ open: boolean }>(
+        `select coalesce(paid_at, created_at) > now() - make_interval(days => $2) as open from public.donations where id = $1`,
+        [d.id, REFUND_WINDOW_DAYS],
+        c,
+      );
+      if (!w?.open) throw new AppError("CONFLICT", `Refunds can only be requested within ${REFUND_WINDOW_DAYS} days of the gift. Please contact us if you need help.`);
+    }
 
     try {
       await pay.refund(d.provider_payment_id);

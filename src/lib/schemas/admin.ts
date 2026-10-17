@@ -95,6 +95,7 @@ export const givingSettingsSchema = z
       .max(MAX_PRESETS, `At most ${MAX_PRESETS} amounts`)
       .transform((a) => [...new Set(a)].sort((x, y) => x - y)),
     showTopSupporters: z.boolean(),
+    showRecentSupporters: z.boolean(),
   })
   .superRefine((v, ctx) => {
     if (v.presets.some((n) => n < v.minDonation)) {

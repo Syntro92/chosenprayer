@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { RefundByLink } from "@/components/account/refund-by-link";
-import { formatMoney } from "@/lib/giving";
+import { formatMoney, REFUND_WINDOW_DAYS } from "@/lib/giving";
 import { getDonationForRefund } from "@/server/services/giving";
 
 export const metadata: Metadata = {
@@ -41,6 +41,16 @@ async function Refund({ searchParams }: { searchParams: PageProps<"/donation/ref
       <>
         <h1 className="text-2xl font-semibold tracking-tight text-charcoal-deep">Nothing to refund</h1>
         <p className="mt-3 text-sm leading-relaxed text-slate">That payment was never completed, so you haven&apos;t been charged.</p>
+      </>
+    );
+  }
+  if (d.expired) {
+    return (
+      <>
+        <h1 className="text-2xl font-semibold tracking-tight text-charcoal-deep">The refund period has ended</h1>
+        <p className="mt-3 text-sm leading-relaxed text-slate">
+          Gifts can be refunded within {REFUND_WINDOW_DAYS} days of paying. Your gift to {d.channelName} is past that, so please contact us if you need help.
+        </p>
       </>
     );
   }

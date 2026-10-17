@@ -54,11 +54,25 @@ export interface ChannelProfileData {
   /** False (the default) unless an admin switched the site-wide Top Supporters list on (Admin > Channels > Support settings). */
   showTopSupporters: boolean;
   topSupporters: { name: string; total: number }[];
+  /** False when an admin switched the site-wide Recent Supporters list off (Admin > Channels > Support settings). */
+  showRecentSupporters: boolean;
+  /** The latest succeeded gifts, newest first (empty when switched off). Names are masked like the top supporters; emails and ids never leave the service. */
+  recentSupporters: RecentSupporterItem[];
+  /** Pass to listRecentSupporters for the next page; null when there are no more. */
+  recentNextCursor: string | null;
   givingPresets: number[];
 }
 
 /** How many supporters the public list shows. */
 export const TOP_SUPPORTERS_LIMIT = 5;
+/** Recent supporters per page: the first page on the channel page, then each "Load more". */
+export const RECENT_SUPPORTERS_LIMIT = 6;
+
+export interface RecentSupporterItem {
+  name: string;
+  amount: number;
+  paidAt: string; // ISO timestamp
+}
 
 export interface Category {
   slug: string;
@@ -221,6 +235,69 @@ export async function getFeaturedChannel(conn: Queryable = db): Promise<ChannelS
   return r ? toSummary(r) : null;
 }
 
+/**
+ * One row per succeeded gift (refunds drop out), newest first, keyset-paged on (paid_at, id).
+ * A name is shown only when the donor gave one and did not leave an anonymous blessing for this gift.
+ */
+async function recentSupporterPage(channelId: string, cursor: Cursor | null, conn: Queryable): Promise<Page<RecentSupporterItem>> {
+  const params: unknown[] = [channelId];
+  let after = "";
+  if (cursor) {
+    params.push(cursor.k, cursor.id);
+    after = "and (d.paid_at, d.id) < ($2::timestamptz, $3::uuid)";
+  }
+  params.push(RECENT_SUPPORTERS_LIMIT + 1);
+  let fetched: { id: string; name: string | null; anonymous: boolean; amount_cents: number; paid_raw: string }[];
+  try {
+    fetched = await rows(
+      `select d.id, coalesce(p.display_name, d.donor_name) as name,
+              exists (select 1 from public.blessings b where b.donation_id = d.id and b.is_anonymous) as anonymous,
+              d.amount_cents::float8 as amount_cents,
+              to_char(d.paid_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as paid_raw
+       from public.donations d
+       left join public.profiles p on p.id = d.donor_id
+       where d.channel_id = $1 and d.status = 'succeeded' and d.paid_at is not null ${after}
+       order by d.paid_at desc, d.id desc
+       limit $${params.length}`,
+      params,
+      conn,
+    );
+  } catch (e) {
+    // A hand-edited cursor can be well-formed JSON yet not a valid uuid/timestamp.
+    if ((e as { code?: string }).code === "22P02" || (e as { code?: string }).code === "22007") {
+      throw new AppError("VALIDATION", "Invalid cursor.", { fields: { cursor: "Invalid cursor" } });
+    }
+    throw e;
+  }
+  const page = toPage(fetched, RECENT_SUPPORTERS_LIMIT, (r) => ({ k: r.paid_raw, id: r.id }));
+  return {
+    nextCursor: page.nextCursor,
+    items: page.items.map((r) => ({
+      name: r.anonymous || !r.name ? "Anonymous" : r.name,
+      amount: Math.round(r.amount_cents / 100),
+      paidAt: new Date(r.paid_raw).toISOString(),
+    })),
+  };
+}
+
+/** "Load more" for the Recent Supporters list. Empty when the channel is not active or an admin switched the list off. */
+export async function listRecentSupporters(
+  rawHandle: string,
+  rawCursor: string | null | undefined,
+  conn: Queryable = db,
+): Promise<Page<RecentSupporterItem>> {
+  const parsed = handleSchema.safeParse(rawHandle);
+  if (!parsed.success) throw new AppError("NOT_FOUND", "Channel not found.");
+  const cursor = decodeCursor(rawCursor);
+  if (cursor && (!UUID_RE.test(cursor.id) || typeof cursor.k !== "string" || Number.isNaN(Date.parse(cursor.k)))) {
+    throw new AppError("VALIDATION", "Invalid cursor.", { fields: { cursor: "Invalid cursor" } });
+  }
+  const channel = await one<{ id: string }>("select id from public.channels where handle = $1 and status = 'active'", [parsed.data], conn);
+  if (!channel) throw new AppError("NOT_FOUND", "Channel not found.");
+  if (!(await readGivingSettings(conn)).showRecentSupporters) return { items: [], nextCursor: null };
+  return recentSupporterPage(channel.id, cursor, conn);
+}
+
 const KIND_LABEL = { reflection: "Reflection", video: "Video", message: "Message", story: "Story" } as const;
 
 /** Everything the public channel page needs. NOT_FOUND unless the channel is active. */
@@ -295,6 +372,10 @@ export async function getChannelProfile(
       )
     : [];
 
+  const recent = giving.showRecentSupporters
+    ? await recentSupporterPage(base.id, null, conn)
+    : { items: [], nextCursor: null };
+
   return {
     channel: toSummary(base),
     data: {
@@ -326,6 +407,9 @@ export async function getChannelProfile(
         name: s.anonymous || !s.name ? "Anonymous" : s.name,
         total: Math.round(s.total_cents / 100),
       })),
+      showRecentSupporters: giving.showRecentSupporters,
+      recentSupporters: recent.items,
+      recentNextCursor: recent.nextCursor,
     },
   };
 }

@@ -21,8 +21,8 @@ import {
   startDonation,
   sweepStaleDonations,
 } from "@/server/services/giving";
-import { getChannelProfile } from "@/server/services/channels";
-import { subscriptionCancelUrl } from "@/server/services/subscription-links";
+import { getChannelProfile, listRecentSupporters } from "@/server/services/channels";
+import { donationRefundUrl, subscriptionCancelUrl } from "@/server/services/subscription-links";
 import { listNotifications } from "@/server/services/notifications";
 import { channel, FakeProvider, member, saturate } from "../helpers/fixtures";
 import { withRollback } from "../helpers/rollback";
@@ -649,6 +649,34 @@ describe("refund by email link", () => {
     }));
 });
 
+describe("7-day refund window", () => {
+  it("blocks donors after 7 days (button and email link) but not admins", () =>
+    withRollback(async (c) => {
+      const donor = await member(c);
+      const admin = await member(c, { role: "admin" });
+      const ch = await channel(c);
+      const prov = new FakeProvider();
+      const fresh = await paid(c, donor, ch, {}, prov);
+      const old = await paid(c, donor, ch, {}, prov);
+      await c.query("update public.donations set paid_at = now() - interval '8 days' where id = $1", [old.donationId]);
+      await c.query("update public.donations set paid_at = now() - interval '6 days' where id = $1", [fresh.donationId]);
+
+      const list = (await listMyDonations(donor, {}, c)).items;
+      expect(list.find((d) => d.id === fresh.donationId)!.refundable).toBe(true);
+      expect(list.find((d) => d.id === old.donationId)!.refundable).toBe(false);
+
+      await expect(requestMyRefund(donor, old.donationId, c, prov)).rejects.toMatchObject({ code: "CONFLICT", message: expect.stringContaining("7 days") });
+      const token = new URL(donationRefundUrl(old.donationId)).searchParams.get("token")!;
+      expect((await getDonationForRefund(token, c))!.expired).toBe(true);
+      await expect(refundByToken(token, c, prov)).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(prov.refunded).toHaveLength(0);
+
+      await requestMyRefund(donor, fresh.donationId, c, prov);
+      await adminRefund(admin, old.donationId, { reason: "Goodwill" }, c, prov);
+      expect(prov.refunded).toEqual([fresh.pid, old.pid]);
+    }));
+});
+
 describe("sweepStaleDonations", () => {
   it("closes abandoned checkouts older than a day and nothing else", () =>
     withRollback(async (c) => {
@@ -742,6 +770,56 @@ describe("blessings", () => {
       for (const secret of ["Shy Sam", "Refunded Rae", "example.com"]) expect(json).not.toContain(secret);
       // Only name and total are public.
       expect(Object.keys(data.topSupporters[0]).sort()).toEqual(["name", "total"]);
+    }));
+
+  it("recent supporters: newest first, names masked, refunds dropped, capped, nothing private exposed", () =>
+    withRollback(async (c) => {
+      const ch = await channel(c, { name: "Recent Channel" });
+      const sarah = await member(c, { name: "Sarah Supporter" });
+      const old = await paid(c, sarah, ch, { amount: 30 });
+      const shy = await paid(c, null, ch, { amount: 200, donorEmail: "shy@example.com", donorName: "Shy Sam" });
+      await createBlessing(null, { donationId: shy.donationId, token: shy.token, message: "Quietly", anonymous: true }, c);
+      const refunded = await paid(c, null, ch, { amount: 900, donorEmail: "gone@example.com", donorName: "Refunded Rae" });
+      await handle(c, { type: "payment.refunded", eventId: randomUUID(), providerPaymentId: refunded.pid } as PaymentEvent);
+      const gary = await paid(c, null, ch, { amount: 50, donorEmail: "guest@example.com", donorName: "Guest Gary" });
+      // Pin the order: Sarah oldest, then Shy, then Gary newest.
+      await c.query("update public.donations set paid_at = now() - interval '3 days' where id = $1", [old.donationId]);
+      await c.query("update public.donations set paid_at = now() - interval '2 hours' where id = $1", [shy.donationId]);
+      await c.query("update public.donations set paid_at = now() - interval '5 minutes' where id = $1", [gary.donationId]);
+
+      const { data } = await getChannelProfile(ch.handle, c);
+      expect(data.recentSupporters.map((s) => [s.name, s.amount])).toEqual([
+        ["Guest Gary", 50],
+        ["Anonymous", 200], // chose privacy, despite giving a name
+        ["Sarah Supporter", 30],
+      ]);
+      expect(new Date(data.recentSupporters[0].paidAt).getTime()).toBeGreaterThan(Date.now() - 10 * 60_000);
+      const json = JSON.stringify(data.recentSupporters);
+      for (const secret of ["Shy Sam", "Refunded Rae", "example.com"]) expect(json).not.toContain(secret);
+      expect(Object.keys(data.recentSupporters[0]).sort()).toEqual(["amount", "name", "paidAt"]);
+
+      for (let i = 0; i < 8; i++) {
+        const g = await paid(c, null, ch, { amount: 25, donorEmail: `x${i}@example.com`, donorName: `X${i}` });
+        // The whole test runs in one transaction, so every now() is the same instant: give each gift its own time.
+        await c.query("update public.donations set paid_at = now() - ($2 || ' minutes')::interval where id = $1", [g.donationId, String(10 + i)]);
+      }
+      const first = (await getChannelProfile(ch.handle, c)).data;
+      expect(first.recentSupporters).toHaveLength(6);
+      expect(first.recentNextCursor).not.toBeNull();
+
+      // Load more: the next pages continue where this one stopped, with no overlap, until the cursor runs out.
+      const second = await listRecentSupporters(ch.handle, first.recentNextCursor, c);
+      expect(second.items).toHaveLength(5); // 3 earlier gifts + 8 new = 11 in total, 6 shown already
+      expect(second.nextCursor).toBeNull();
+      const seen = [...first.recentSupporters, ...second.items].map((s) => s.paidAt);
+      expect(new Set(seen).size).toBe(11);
+      expect([...seen].sort().reverse()).toEqual(seen); // newest first across pages
+      await expect(listRecentSupporters(ch.handle, "not-a-cursor", c)).rejects.toMatchObject({ code: "VALIDATION" });
+
+      // An admin can switch the whole list off: nothing is read or exposed.
+      await c.query("update public.site_settings set show_recent_supporters = false where id", []);
+      expect((await getChannelProfile(ch.handle, c)).data).toMatchObject({ showRecentSupporters: false, recentSupporters: [], recentNextCursor: null });
+      expect(await listRecentSupporters(ch.handle, first.recentNextCursor, c)).toEqual({ items: [], nextCursor: null });
     }));
 
   it("top supporters shows at most five", () =>

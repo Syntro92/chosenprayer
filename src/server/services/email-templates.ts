@@ -1,4 +1,4 @@
-import { formatMoney, safeReceiptUrl } from "@/lib/giving";
+import { formatMoney } from "@/lib/giving";
 
 // Pure functions (no I/O): the outbox stores a template name + JSON payload, and the worker
 // renders it at send time. Everything interpolated into HTML is escaped.
@@ -66,7 +66,6 @@ export function renderEmail(template: string, payload: Record<string, unknown>):
       const monthly = payload.frequency === "monthly";
       const date = str(payload.paidAt).slice(0, 10);
       const ref = str(payload.donationId).slice(0, 8).toUpperCase();
-      const receiptUrl = safeReceiptUrl(payload.receiptUrl);
       const cancelUrl = monthly && /^https?:\/\//.test(str(payload.cancelUrl)) ? str(payload.cancelUrl) : "";
       const refundUrl = /^https?:\/\//.test(str(payload.refundUrl)) ? str(payload.refundUrl) : "";
       const lines = [
@@ -82,9 +81,8 @@ export function renderEmail(template: string, payload: Record<string, unknown>):
           "",
           ...lines.map(([k, v]) => `${k}: ${v}`),
           "",
-          ...(receiptUrl ? [`Download your receipt: ${receiptUrl}`, ""] : []),
           ...(cancelUrl ? [`Cancel monthly support: ${cancelUrl}`, ""] : []),
-          ...(refundUrl ? [`Changed your mind? Request a refund (it goes back to the card you paid with): ${refundUrl}`, ""] : []),
+          ...(refundUrl ? [`Changed your mind? Request a refund within 7 days (it goes back to the card you paid with): ${refundUrl}`, ""] : []),
           monthly ? "Your monthly support continues until you cancel it." : "This was a one-time contribution.",
           "Your contribution is voluntary and is a record of your support, not a tax document.",
         ].join("\n"),
@@ -98,9 +96,8 @@ export function renderEmail(template: string, payload: Record<string, unknown>):
             .filter(([k]) => k !== "Amount")
             .map(([k, v]) => `<tr><td style="padding:11px 0;border-top:1px solid ${C.line};color:${C.slate}">${escapeHtml(k)}</td><td style="padding:11px 0;border-top:1px solid ${C.line};text-align:right;font-weight:600">${escapeHtml(v)}</td></tr>`)
             .join("")}</table>
-${receiptUrl ? button(receiptUrl, "Download Stripe receipt") : ""}
 ${cancelUrl ? outlineButton(cancelUrl, "Cancel monthly support") : ""}
-${refundUrl ? note(`Changed your mind? You can <a href="${escapeHtml(refundUrl)}" style="color:${C.ink};font-weight:600">request a refund</a> and it goes back to the card you paid with.`) : ""}
+${refundUrl ? note(`Changed your mind? You can <a href="${escapeHtml(refundUrl)}" style="color:${C.ink};font-weight:600">request a refund</a> within 7 days, and it goes back to the card you paid with.`) : ""}
 ${note(`${monthly ? "Your monthly support continues until you cancel it." :"This was a one-time contribution."} Your contribution is voluntary and is a record of your support, not a tax document.`)}`,
           `${amount} to ${channel}`,
         ),

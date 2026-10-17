@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { followAction, getFollowStateAction, unfollowAction } from "@/actions/follows";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { loadRecentSupportersAction } from "@/actions/channels";
+import { getFollowStateAction } from "@/actions/follows";
 import {
   createBlessingAction,
   getDonationStatusAction,
@@ -17,13 +17,15 @@ import {
   formatDate,
   formatFollowers,
   formatSupporters,
+  timeAgo,
   type Channel,
   type ChannelProfileData,
   type Blessing,
+  type RecentSupporter,
   type TopSupporter,
 } from "@/lib/channels";
 import { OriginButton } from "@/components/ui/origin-button";
-import { CoverArt, CoverPhoto, CrowdIllustration, TONE_CLASS } from "./illustrations";
+import { CoverArt, CrowdIllustration, TONE_CLASS } from "./illustrations";
 import { StripePayment } from "./stripe-payment";
 
 const focus =
@@ -112,8 +114,18 @@ export function SupportForm({
   const belowMin = value.amount === "custom" && value.custom !== "" && amount < minAmount;
   const set = (patch: Partial<Support>) => onChange({ ...value, ...patch });
 
+  // Amount grid: 3 columns on mobile / in the modal. On desktop up to 5 presets share one row with
+  // Custom; more wrap into rows of 5, and Custom stretches over the free cells of the last row.
+  const count = presets.length;
+  const spanM = count % 3 === 0 ? 3 : 3 - (count % 3);
+  const cols = count <= 5 ? count + 1 : 5;
+  const spanD = count <= 5 ? 1 : count % 5 === 0 ? 5 : 5 - (count % 5);
+
+  // `lg:` sizes only apply outside the modal: on desktop the form is the page's hero, so it scales up.
+  const lg = (classes: string) => (compact ? "" : classes);
+
   const chip = (selected: boolean) =>
-    `h-12 rounded-xl border text-sm font-semibold transition active:scale-[0.97] ${focus} ${
+    `h-12 rounded-xl border text-sm font-semibold transition active:scale-[0.97] ${lg("lg:h-16 lg:flex-1 lg:rounded-2xl lg:text-2xl")} ${focus} ${
       selected
         ? "border-bless bg-bless text-charcoal-deep shadow-sm"
         : "border-line bg-white text-charcoal-deep hover:border-charcoal-deep/40"
@@ -123,10 +135,10 @@ export function SupportForm({
     <div>
       {!compact && (
         <>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate lg:text-sm">
             Support {channel.name}
           </p>
-          <p className="mt-3 leading-relaxed text-charcoal-deep/85">
+          <p className="mt-3 leading-relaxed text-charcoal-deep/85 lg:text-xl lg:leading-relaxed">
             If this channel has brought something meaningful to your life, you
             can give something back.
           </p>
@@ -136,7 +148,7 @@ export function SupportForm({
       <div
         role="radiogroup"
         aria-label="Frequency"
-        className={`grid grid-cols-2 gap-1 rounded-xl bg-mist p-1 ${compact ? "" : "mt-5"}`}
+        className={`grid grid-cols-2 gap-1 rounded-xl bg-mist p-1 ${compact ? "" : "mt-5 lg:mt-5 lg:rounded-2xl lg:p-1.5"}`}
       >
         {(
           [
@@ -152,7 +164,7 @@ export function SupportForm({
             onClick={() => set({ frequency: key })}
             disabled={key === "monthly" && config?.recurring === false}
             title={key === "monthly" && config?.recurring === false ? "Monthly giving isn't available right now" : undefined}
-            className={`h-10 rounded-lg text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${focus} ${
+            className={`h-10 rounded-lg text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${lg("lg:h-14 lg:rounded-xl lg:text-xl")} ${focus} ${
               value.frequency === key
                 ? "bg-white text-charcoal-deep shadow-sm"
                 : "text-slate hover:text-charcoal-deep"
@@ -166,33 +178,37 @@ export function SupportForm({
       <div
         role="radiogroup"
         aria-label="Amount"
-        className="mt-4 grid grid-cols-3 gap-2"
+        style={{ "--cols": cols } as React.CSSProperties}
+        className={`mt-4 grid grid-cols-3 gap-2 ${lg("lg:mt-6 lg:gap-3 lg:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]")}`}
       >
         {presets.map((n) => (
-          <button
-            key={n}
-            type="button"
-            role="radio"
-            aria-checked={value.amount === n}
-            onClick={() => set({ amount: n })}
-            className={chip(value.amount === n)}
-          >
-            ${n}
-          </button>
+          <div key={n} className="relative">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={value.amount === n}
+              onClick={() => set({ amount: n })}
+              className={`${chip(value.amount === n)} w-full`}
+            >
+              ${n}
+            </button>
+          </div>
         ))}
         <button
           type="button"
           role="radio"
           aria-checked={value.amount === "custom"}
           onClick={() => set({ amount: "custom" })}
-          className={chip(value.amount === "custom")}
+          // Custom takes whatever is left in the last row, so the grid never has a gap.
+          style={{ "--span-m": spanM, "--span-d": spanD } as React.CSSProperties}
+          className={`${chip(value.amount === "custom")} [grid-column:span_var(--span-m)] ${lg("lg:[grid-column:span_var(--span-d)]")}`}
         >
           Custom
         </button>
       </div>
 
       {value.amount === "custom" && (
-        <label className="mt-3 flex h-12 items-center gap-2 rounded-xl border border-charcoal-deep/30 bg-white px-4 focus-within:ring-2 focus-within:ring-charcoal-deep focus-within:ring-offset-2">
+        <label className={`mt-3 flex h-12 items-center gap-2 rounded-xl border border-charcoal-deep/30 bg-white px-4 focus-within:ring-2 focus-within:ring-charcoal-deep focus-within:ring-offset-2 ${lg("lg:mt-5 lg:h-[72px] lg:gap-3 lg:rounded-2xl lg:px-6 lg:text-2xl")}`}>
           <span className="font-semibold text-slate">$</span>
           <span className="sr-only">Custom amount in dollars</span>
           <input
@@ -203,12 +219,12 @@ export function SupportForm({
               set({ custom: e.target.value.replace(/\D/g, "").slice(0, 6) })
             }
             placeholder="Enter amount"
-            className="w-full bg-transparent text-sm font-semibold text-charcoal-deep outline-none placeholder:font-normal placeholder:text-slate/70"
+            className={`w-full bg-transparent text-sm font-semibold text-charcoal-deep outline-none placeholder:font-normal placeholder:text-slate/70 ${lg("lg:text-2xl")}`}
           />
         </label>
       )}
       {belowMin && (
-        <p role="alert" className="mt-2 text-xs font-medium text-red-600">
+        <p role="alert" className={`mt-2 text-xs font-medium text-red-600 ${lg("lg:text-base")}`}>
           Minimum {money(minAmount)}
         </p>
       )}
@@ -217,7 +233,7 @@ export function SupportForm({
         type="button"
         disabled={!ready}
         onClick={onContinue}
-        className="mt-5 w-full"
+        className={`mt-5 w-full ${lg("lg:mt-6 lg:h-16 lg:rounded-2xl lg:text-2xl")}`}
       >
         {ready
           ? `Support · ${money(amount)}${value.frequency === "monthly" ? "/mo" : ""}`
@@ -225,11 +241,11 @@ export function SupportForm({
       </OriginButton>
 
       {paused && (
-        <p role="status" className="mt-4 rounded-xl bg-cream px-4 py-3 text-center text-sm text-charcoal-deep">
+        <p role="status" className={`mt-4 rounded-xl bg-cream px-4 py-3 text-center text-sm text-charcoal-deep ${lg("lg:text-lg")}`}>
           Giving is paused right now. Please check back soon.
         </p>
       )}
-      <p className="mt-4 text-center text-sm text-slate">
+      <p className={`mt-4 text-center text-sm text-slate ${lg("lg:mt-6 lg:text-lg")}`}>
         Your contribution is voluntary.
         <br />
         Secure payment with Stripe.
@@ -257,11 +273,15 @@ export function SupportModal({
   config,
   signedIn,
   presets,
+  inline = false,
 }: {
   channel: Channel;
   value: Support;
   onChange: (next: Support) => void;
+  /** Modal: closes it. Inline: returns to the amount form. */
   onClose: () => void;
+  /** Render in place (inside the support card, starting at "confirm") instead of as an overlay. */
+  inline?: boolean;
   onBlessing: (blessing: Blessing) => void;
   /** False when the channel has blessings switched off: the thank-you screen skips the message prompt. */
   blessingsEnabled?: boolean;
@@ -269,7 +289,9 @@ export function SupportModal({
   signedIn: boolean;
   presets?: readonly number[];
 }) {
-  const [step, setStep] = useState<Step>("choose");
+  const [step, setStep] = useState<Step>(inline ? "confirm" : "choose");
+  // Inline, the amount was already chosen in the card, so we start on "confirm" and `goConfirm` never runs.
+  const L = (classes: string) => (inline ? classes : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
@@ -280,7 +302,7 @@ export function SupportModal({
   const [card, setCard] = useState<{ clientSecret: string; id: string; token: string } | null>(null);
   const [cardPaid, setCardPaid] = useState(false);
   // One key per attempt: retrying the SAME attempt can never charge twice.
-  const attemptKey = useRef("");
+  const attemptKey = useRef(inline ? crypto.randomUUID() : "");
   // Blessing form
   const [writing, setWriting] = useState(false);
   const [message, setMessage] = useState("");
@@ -293,6 +315,7 @@ export function SupportModal({
   const amount = resolveAmount(value);
 
   useEffect(() => {
+    if (inline) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -304,7 +327,7 @@ export function SupportModal({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, [onClose, inline]);
 
   const goConfirm = () => {
     attemptKey.current = crypto.randomUUID();
@@ -435,30 +458,38 @@ export function SupportModal({
   const canShowName = signedIn || guestName.trim() !== "";
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-6">
-      <div
-        className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-hidden
-      />
+    <div className={inline ? "" : "fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-6"}>
+      {!inline && (
+        <div
+          className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-[2px]"
+          onClick={onClose}
+          aria-hidden
+        />
+      )}
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
+        role={inline ? "group" : "dialog"}
+        aria-modal={inline ? undefined : true}
         aria-label={`Support ${channel.name}`}
         tabIndex={-1}
-        className="relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[24px] bg-white p-6 shadow-2xl outline-none sm:max-w-md sm:rounded-[24px] sm:p-8"
+        className={
+          inline
+            ? "outline-none"
+            : "relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[24px] bg-white p-6 shadow-2xl outline-none sm:max-w-md sm:rounded-[24px] sm:p-8"
+        }
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className={`absolute right-4 top-4 flex size-9 items-center justify-center rounded-full text-slate transition hover:bg-mist hover:text-charcoal-deep ${focus}`}
-        >
-          <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-            <path d="m6 6 12 12M18 6 6 18" />
-          </svg>
-        </button>
+        {!inline && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className={`absolute right-4 top-4 flex size-9 items-center justify-center rounded-full text-slate transition hover:bg-mist hover:text-charcoal-deep ${focus}`}
+          >
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        )}
 
         {step === "choose" && (
           <>
@@ -474,16 +505,16 @@ export function SupportModal({
 
         {step === "confirm" && (
           <>
-            <h2 className="pr-8 text-2xl font-semibold tracking-tight text-charcoal-deep">
+            <h2 className={`pr-8 text-2xl font-semibold tracking-tight text-charcoal-deep ${L("lg:pr-0 lg:text-4xl")}`}>
               Review your support
             </h2>
-            <dl className="mt-6 divide-y divide-line rounded-xl border border-line text-sm">
+            <dl className={`mt-6 divide-y divide-line rounded-xl border border-line text-sm ${L("lg:mt-8 lg:rounded-2xl lg:text-xl")}`}>
               {[
                 ["Channel", channel.name],
                 ["Amount", money(amount)],
                 ["Frequency", value.frequency === "monthly" ? "Monthly" : "One-time"],
               ].map(([k, v]) => (
-                <div key={k} className="flex justify-between px-4 py-3">
+                <div key={k} className={`flex justify-between gap-4 px-4 py-3 ${L("lg:px-6 lg:py-5")}`}>
                   <dt className="text-slate">{k}</dt>
                   <dd className="font-semibold text-charcoal-deep">{v}</dd>
                 </div>
@@ -491,9 +522,9 @@ export function SupportModal({
             </dl>
 
             {!signedIn && (
-              <div className="mt-5 space-y-3">
+              <div className={`mt-5 space-y-3 ${L("lg:mt-8 lg:space-y-5")}`}>
                 <div>
-                  <label htmlFor="donor-email" className="text-sm font-semibold text-charcoal-deep">
+                  <label htmlFor="donor-email" className={`text-sm font-semibold text-charcoal-deep ${L("lg:text-lg")}`}>
                     Email for your receipt
                   </label>
                   <input
@@ -507,12 +538,12 @@ export function SupportModal({
                     }}
                     aria-invalid={emailError ? true : undefined}
                     placeholder="you@example.com"
-                    className={`mt-2 h-11 w-full rounded-xl border px-3 text-sm text-charcoal-deep placeholder:text-slate/70 ${focus} ${emailError ? "border-red-600" : "border-line"}`}
+                    className={`mt-2 h-11 w-full rounded-xl border px-3 text-sm text-charcoal-deep placeholder:text-slate/70 ${L("lg:h-16 lg:rounded-2xl lg:px-5 lg:text-xl")} ${focus} ${emailError ? "border-red-600" : "border-line"}`}
                   />
-                  {emailError && <p role="alert" className="mt-1 text-sm text-red-700">{emailError}</p>}
+                  {emailError && <p role="alert" className={`mt-1 text-sm text-red-700 ${L("lg:text-base")}`}>{emailError}</p>}
                 </div>
                 <div>
-                  <label htmlFor="donor-name" className="text-sm font-semibold text-charcoal-deep">
+                  <label htmlFor="donor-name" className={`text-sm font-semibold text-charcoal-deep ${L("lg:text-lg")}`}>
                     Your name <span className="font-normal text-slate">(optional)</span>
                   </label>
                   <input
@@ -522,23 +553,23 @@ export function SupportModal({
                     maxLength={80}
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
-                    className={`mt-2 h-11 w-full rounded-xl border border-line px-3 text-sm text-charcoal-deep ${focus}`}
+                    className={`mt-2 h-11 w-full rounded-xl border border-line px-3 text-sm text-charcoal-deep ${L("lg:h-16 lg:rounded-2xl lg:px-5 lg:text-xl")} ${focus}`}
                   />
                 </div>
               </div>
             )}
 
             {config?.testMode && (
-              <p className="mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
+              <p className={`mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep ${L("lg:px-6 lg:py-4 lg:text-lg")}`}>
                 <span className="font-semibold">Test mode.</span> This is a practice payment. No real money moves.
                 {config.provider === "stripe" && " Use the test card 4242 4242 4242 4242, any future date and any CVC."}
               </p>
             )}
-            <p className="mt-4 text-sm text-slate">
+            <p className={`mt-4 text-sm text-slate ${L("lg:text-lg")}`}>
               Your contribution is voluntary. Secure payment with Stripe.
             </p>
             {error && (
-              <p role="alert" className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+              <p role="alert" className={`mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800 ${L("lg:text-lg")}`}>
                 {error}
               </p>
             )}
@@ -546,15 +577,15 @@ export function SupportModal({
               type="button"
               onClick={pay}
               disabled={busy}
-              className="mt-5 w-full"
+              className={`mt-5 w-full ${L("lg:mt-8 lg:h-16 lg:rounded-2xl lg:text-2xl")}`}
             >
               {busy ? "Sending…" : `Send ${money(amount)}${value.frequency === "monthly" ? "/mo" : ""}`}
             </OriginButton>
             <button
               type="button"
-              onClick={() => setStep("choose")}
+              onClick={() => (inline ? onClose() : setStep("choose"))}
               disabled={busy}
-              className={`mt-2 h-10 w-full rounded-xl text-sm font-medium text-slate transition hover:text-charcoal-deep ${focus}`}
+              className={`mt-2 h-10 w-full rounded-xl text-sm font-medium text-slate transition hover:text-charcoal-deep ${L("lg:mt-3 lg:h-14 lg:text-xl")} ${focus}`}
             >
               Back
             </button>
@@ -563,13 +594,13 @@ export function SupportModal({
 
         {step === "pay" && card && config?.publishableKey && (
           <>
-            <h2 className="pr-8 text-2xl font-semibold tracking-tight text-charcoal-deep">Payment details</h2>
-            <p className="mt-2 text-sm text-slate">
+            <h2 className={`pr-8 text-2xl font-semibold tracking-tight text-charcoal-deep ${L("lg:pr-0 lg:text-4xl")}`}>Payment details</h2>
+            <p className={`mt-2 text-sm text-slate ${L("lg:text-xl")}`}>
               {money(amount)}
               {value.frequency === "monthly" ? " every month" : ""} to {channel.name}
             </p>
             {config.testMode && (
-              <p className="mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
+              <p className={`mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep ${L("lg:px-6 lg:py-4 lg:text-lg")}`}>
                 <span className="font-semibold">Test mode.</span> No real money moves. Use the test card 4242 4242 4242 4242, any future date and any CVC.
               </p>
             )}
@@ -595,7 +626,8 @@ export function SupportModal({
                 onSubmitted={afterCard}
                 onBack={() => {
                   setCard(null);
-                  setStep("choose");
+                  if (inline) onClose();
+                  else setStep("choose");
                 }}
                 busy={busy}
               />
@@ -608,13 +640,13 @@ export function SupportModal({
             <div className="mx-auto -mt-1 mb-2 w-44">
               <CrowdIllustration size="small" className="w-full" />
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight text-charcoal-deep sm:text-3xl">
+            <h2 className={`text-2xl font-semibold tracking-tight text-charcoal-deep sm:text-3xl ${L("lg:text-4xl")}`}>
               Your blessing has been sent.
             </h2>
-            <p className="mt-3 text-slate">
+            <p className={`mt-3 text-slate ${L("lg:text-xl")}`}>
               Thank you for supporting {channel.name}.
             </p>
-            <p className="mt-1 text-sm text-slate">A receipt is on its way to your email.</p>
+            <p className={`mt-1 text-sm text-slate ${L("lg:text-lg")}`}>A receipt is on its way to your email.</p>
 
             {!blessingsEnabled ? null : sent ? (
               <p className="mt-6 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
@@ -771,17 +803,17 @@ function BlessingCard({ b }: { b: Blessing }) {
 /** Inside the Support card; only rendered when an admin switched Top Supporters on (site-wide). */
 function TopSupporters({ supporters }: { supporters: TopSupporter[] }) {
   return (
-    <div className="mt-6 border-t border-line pt-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate">Top Supporters</p>
+    <div className="mt-6 border-t border-line pt-5 lg:mt-10 lg:pt-8">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate lg:text-sm">Top Supporters</p>
       {supporters.length > 0 ? (
-        <ol className="mt-3 space-y-3">
+        <ol className="mt-3 space-y-3 lg:mt-5 lg:space-y-4">
           {supporters.map((s, i) => {
             const anon = s.name === "Anonymous";
             return (
-              <li key={i} className="flex items-center gap-3">
+              <li key={i} className="flex items-center gap-3 lg:gap-4">
                 <span
                   aria-label={`Rank ${i + 1}`}
-                  className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold lg:size-9 lg:text-base ${
                     i === 0 ? "bg-bless text-charcoal-deep" : "bg-mist text-slate"
                   }`}
                 >
@@ -789,14 +821,14 @@ function TopSupporters({ supporters }: { supporters: TopSupporter[] }) {
                 </span>
                 <span
                   aria-hidden
-                  className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold lg:size-11 lg:text-lg ${
                     anon ? "bg-mist text-slate" : "bg-cream text-charcoal-deep"
                   }`}
                 >
                   {anon ? "·" : s.name.charAt(0).toUpperCase()}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-charcoal-deep">{s.name}</span>
-                <span className="rounded-full bg-cream px-2.5 py-0.5 text-xs font-semibold text-charcoal-deep">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-charcoal-deep lg:text-xl">{s.name}</span>
+                <span className="rounded-full bg-cream px-2.5 py-0.5 text-xs font-semibold text-charcoal-deep lg:px-4 lg:py-1 lg:text-lg">
                   {money(s.total)}
                 </span>
               </li>
@@ -804,9 +836,102 @@ function TopSupporters({ supporters }: { supporters: TopSupporter[] }) {
           })}
         </ol>
       ) : (
-        <p className="mt-3 text-sm text-slate">No supporters yet. Be the first to give.</p>
+        <p className="mt-3 text-sm text-slate lg:mt-5 lg:text-lg">No supporters yet. Be the first to give.</p>
       )}
     </div>
+  );
+}
+
+/** The latest gifts with "5 minutes ago" labels. The page is cached, so the label is worked out in the browser. */
+function RecentSupporters({
+  handle,
+  initial,
+  initialCursor,
+}: {
+  handle: string;
+  initial: RecentSupporter[];
+  initialCursor: string | null;
+}) {
+  const [supporters, setSupporters] = useState(initial);
+  const [cursor, setCursor] = useState(initialCursor);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function loadMore() {
+    if (!cursor || loading) return;
+    setLoading(true);
+    setError("");
+    const r = await loadRecentSupportersAction(handle, cursor);
+    setLoading(false);
+    if (!r.ok) return setError(r.error.message);
+    setSupporters((prev) => [...prev, ...r.data.items]);
+    setCursor(r.data.nextCursor);
+  }
+
+  // Until mounted we show the date (identical on server and client); then a live relative time.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const first = window.setTimeout(() => setNow(Date.now()), 0);
+    const t = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(t);
+    };
+  }, []);
+
+  return (
+    <section aria-labelledby="recent-supporters" className="mt-10 lg:mt-16">
+      <h2 id="recent-supporters" className="text-xs font-semibold uppercase tracking-[0.18em] text-slate lg:text-sm">
+        Recent Supporters
+      </h2>
+      {supporters.length > 0 ? (
+        <ul className={`${card} mt-4 divide-y divide-line px-5 lg:mt-5 lg:rounded-[28px] lg:px-8`}>
+          {supporters.map((s, i) => {
+            const anon = s.name === "Anonymous";
+            return (
+              <li key={`${s.paidAt}-${i}`} className="flex items-center gap-3 py-4 lg:gap-5 lg:py-6">
+                <span
+                  aria-hidden
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-full text-base font-semibold lg:size-14 lg:text-2xl ${
+                    anon ? "bg-mist text-slate" : "bg-cream text-charcoal-deep"
+                  }`}
+                >
+                  {anon ? "·" : s.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base font-semibold text-charcoal-deep lg:text-xl">{s.name}</span>
+                  <time dateTime={s.paidAt} className="block text-sm text-slate lg:text-lg">
+                    {now == null ? formatDate(s.paidAt.slice(0, 10)) : timeAgo(s.paidAt, now)}
+                  </time>
+                </span>
+                <span className="rounded-full bg-cream px-3 py-1 text-sm font-semibold text-charcoal-deep lg:px-5 lg:py-1.5 lg:text-xl">
+                  {money(s.amount)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-4 rounded-[18px] border border-dashed border-line bg-white px-6 py-8 text-center text-slate lg:mt-5 lg:text-lg">
+          No supporters yet. Be the first to give.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="mt-3 text-center text-sm text-red-700 lg:text-base">
+          {error}
+        </p>
+      )}
+      {cursor && (
+        <button
+          type="button"
+          onClick={loadMore}
+          disabled={loading}
+          className={`${ghostBtn} mt-4 w-full disabled:cursor-wait disabled:opacity-60 lg:mt-5 lg:h-16 lg:rounded-2xl lg:text-xl`}
+        >
+          {loading ? "Loading…" : "Load more"}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -869,47 +994,19 @@ export function ChannelProfile({
     custom: "",
   });
   const [open, setOpen] = useState(false);
-  const router = useRouter();
-  // Follow state: the page itself is cached for everyone, so "do I follow this?" is
-  // fetched per viewer after load. Until it arrives the button is a disabled "Follow".
-  const [follow, setFollow] = useState({ ready: false, signedIn: false, following: false });
-  const [, setFollowers] = useState(channel.followers);
-  const [followError, setFollowError] = useState("");
-  const [, startFollow] = useTransition();
-  const following = follow.following;
+  // The page itself is cached for everyone, so "am I signed in?" (the checkout skips the email
+  // field for members) is fetched per viewer after load.
+  const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
     let alive = true;
     getFollowStateAction(channel.handle).then((r) => {
-      if (!alive) return;
-      setFollow(r.ok ? { ready: true, ...r.data } : { ready: true, signedIn: false, following: false });
+      if (alive) setSignedIn(r.ok && r.data.signedIn);
     });
     return () => {
       alive = false;
     };
   }, [channel.handle]);
-
-  function toggleFollow() {
-    if (!follow.signedIn) {
-      router.push(`/signin?next=${encodeURIComponent(`/channels/${channel.handle}`)}`);
-      return;
-    }
-    const next = !follow.following;
-    setFollowError("");
-    setFollow((f) => ({ ...f, following: next }));
-    setFollowers((n) => Math.max(0, n + (next ? 1 : -1)));
-    startFollow(async () => {
-      const r = await (next ? followAction : unfollowAction)(channel.handle);
-      if (r.ok) {
-        setFollowers(r.data.followerCount);
-      } else {
-        setFollow((f) => ({ ...f, following: !next }));
-        setFollowers((n) => Math.max(0, n + (next ? -1 : 1)));
-        setFollowError(r.error.message);
-      }
-    });
-  }
-  const [shared, setShared] = useState(false);
   const [blessings, setBlessings] = useState<Blessing[]>(data.blessings);
   const [blessingsAdded, setBlessingsAdded] = useState(0);
   const [config, setConfig] = useState<GivingConfig | null>(null);
@@ -952,23 +1049,14 @@ export function ChannelProfile({
     };
   }, []);
 
-  const openSupport = () => setOpen(true);
-  const closeSupport = useCallback(() => setOpen(false), []);
-
-  const share = async () => {
-    const url = window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: channel.name, url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      setShared(true);
-      window.setTimeout(() => setShared(false), 2000);
-    } catch {
-      /* user cancelled or clipboard blocked */
-    }
+  // The other "Support" buttons (sticky bar, bottom CTA) bring the user back up to the card.
+  const openSupport = () => {
+    setOpen(true);
+    requestAnimationFrame(() =>
+      mobileSupportRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+    );
   };
+  const closeSupport = useCallback(() => setOpen(false), []);
 
   const addBlessing = (blessing: Blessing) => {
     setBlessings((prev) => [blessing, ...prev]);
@@ -977,156 +1065,112 @@ export function ChannelProfile({
 
   return (
     <div>
-      {/* Mobile: the support card comes first, under a compact channel header */}
-      <section className="mx-auto w-full max-w-xl px-4 pb-2 pt-24 sm:px-6 lg:hidden">
-        <div className="flex items-center gap-4">
-          <Avatar name={channel.name} url={channel.avatarUrl} className="size-16 text-2xl" />
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold tracking-tight text-charcoal-deep">{channel.name}</h1>
-            <p className="truncate text-sm text-slate">
-              @{channel.handle}
-              {channel.subscribers != null && <> · {formatFollowers(channel.subscribers)} subscribers</>}
-            </p>
-          </div>
-        </div>
-        <div
-          ref={mobileSupportRef}
-          className={`${card} mt-5 p-6 shadow-[0_12px_32px_-18px_rgba(23,25,24,0.25)]`}
-        >
-          <SupportForm
-            channel={channel}
-            value={support}
-            onChange={setSupport}
-            onContinue={openSupport}
-            config={config}
-            presets={presets}
-          />
-          {data.showTopSupporters && <TopSupporters supporters={data.topSupporters} />}
-        </div>
-      </section>
-
-      {/* Cover */}
-      <div className="mx-auto hidden w-full max-w-6xl px-4 pt-24 sm:px-6 lg:block lg:px-10">
-        <div
-          className={`relative h-44 overflow-hidden rounded-[22px] bg-gradient-to-br sm:h-60 lg:h-72 lg:rounded-[28px] ${TONE_CLASS[channel.cover.tone]}`}
-        >
-          {channel.coverUrl ? <CoverPhoto url={channel.coverUrl} /> : <CoverArt scene={channel.cover.scene} />}
-          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white/30 to-transparent" />
-        </div>
-      </div>
-
-      <div className="mx-auto grid w-full max-w-6xl gap-x-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-10">
-        {/* ----- Main column ----- */}
-        <div className="min-w-0">
-          {/* Identity */}
-          <header className="px-1 max-lg:mt-10 sm:px-4">
-            <div className="hidden lg:block">
+      {/* The support card comes first, under the channel header. Same layout on every screen; scaled up and centred on desktop. */}
+      <section className="mx-auto w-full max-w-xl px-4 pb-2 pt-24 sm:px-6 lg:max-w-4xl lg:pt-24">
+        <div className="flex items-center gap-4 lg:flex-col lg:gap-0 lg:text-center">
+          <div className="relative shrink-0">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -inset-5 hidden rounded-full bg-[radial-gradient(circle,rgba(255,190,0,0.28)_0%,rgba(255,190,0,0.1)_55%,transparent_72%)] lg:block"
+            />
             <Avatar
               name={channel.name}
               url={channel.avatarUrl}
-              className="-mt-12 size-24 text-4xl sm:-mt-14 sm:size-28 sm:text-5xl"
+              className="size-16 text-2xl lg:size-24 lg:text-4xl lg:border-4"
             />
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <h1 className="text-3xl font-semibold tracking-tight text-charcoal-deep sm:text-4xl">
-                {channel.name}
-              </h1>
-              {channel.verified && (
-                <span
-                  title="Verified channel"
-                  className="inline-flex items-center gap-1 rounded-full bg-cream px-2.5 py-1 text-xs font-semibold text-charcoal-deep"
-                >
-                  <svg viewBox="0 0 20 20" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="m4.500 10.500 3.500 3.500 7.500-8" />
-                  </svg>
-                  Verified
-                </span>
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-charcoal-deep lg:mt-3 lg:text-3xl">
+              {channel.name}
+            </h1>
+            <p className="truncate text-sm text-slate lg:mt-1 lg:text-base">
+              @{channel.handle}
+              {channel.subscribers != null && <> · {formatFollowers(channel.subscribers)} subscribers</>}
+              {data.youtubeUrl && (
+                <>
+                  <span className="hidden lg:inline"> · </span>
+                  <a
+                    href={data.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`hidden font-semibold text-bless-deep underline-offset-4 hover:underline lg:inline ${focus}`}
+                  >
+                    Visit channel
+                  </a>
+                </>
               )}
-            </div>
-            <p className="mt-1 text-slate">@{channel.handle}</p>
-            </div>
-            <p className="max-w-xl text-lg leading-relaxed text-charcoal-deep/85 lg:mt-4">
-              {channel.description}
             </p>
+          </div>
+        </div>
 
-            <dl className="mt-7 flex gap-8 sm:gap-12">
-              {[
-                [channel.subscribers == null ? "—" : formatFollowers(channel.subscribers), "Subscribers"],
-                ...(data.showBlessings ? [[formatFollowers(blessingCount), "Blessings"]] : []),
-              ].map(([n, label]) => (
-                <div key={label}>
-                  <dd className="text-2xl font-semibold tracking-tight text-charcoal-deep">
-                    {n}
-                  </dd>
-                  <dt className="text-sm text-slate">{label}</dt>
-                </div>
-              ))}
-            </dl>
+        {/* Desktop-only headline block */}
+        <div className="hidden text-center lg:mt-5 lg:block">
+          <span className="inline-block rounded-full bg-cream px-5 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-bless-deep">
+            Give as your heart leads
+          </span>
+          <h2 className="mx-auto mt-4 max-w-4xl font-serif text-4xl font-bold leading-[1.2] tracking-tight text-charcoal-deep">
+            Support the work of {channel.name}
+          </h2>
+        </div>
 
-            <div className="mt-7 grid grid-cols-2 gap-3 lg:flex lg:flex-wrap">
-              <OriginButton
-                type="button"
-                onClick={openSupport}
-                className="hidden lg:inline-flex"
-              >
-                <Heart className="size-4" />
-                Support This Channel
-              </OriginButton>
-              {data.youtubeUrl ? (
-                // sub_confirmation=1 opens the channel with YouTube's "Subscribe?" prompt already showing.
-                <a
-                  href={`${data.youtubeUrl}?sub_confirmation=1`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`inline-flex h-12 items-center justify-center rounded-xl border border-charcoal-deep bg-charcoal-deep px-5 text-sm font-semibold text-white transition hover:bg-charcoal-deep/90 active:scale-[0.98] ${focus}`}
-                >
-                  Subscribe
-                </a>
-              ) : (
-              <button
-                type="button"
-                aria-pressed={following}
-                disabled={!follow.ready}
-                onClick={toggleFollow}
-                className={`inline-flex h-12 items-center justify-center rounded-xl border px-5 text-sm font-semibold transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 ${focus} ${
-                  following
-                    ? "border-charcoal-deep/20 bg-mist text-charcoal-deep"
-                    : "border-charcoal-deep bg-charcoal-deep text-white hover:bg-charcoal-deep/90"
-                }`}
-              >
-                {following ? "Following" : "Follow"}
-              </button>
-              )}
-              <button
-                type="button"
-                onClick={share}
-                className={`inline-flex h-12 items-center justify-center rounded-xl border border-bless bg-cream px-5 text-sm font-semibold text-charcoal-deep transition hover:bg-bless/30 active:scale-[0.98] ${focus}`}
-              >
-                {shared ? "Link copied" : "Share"}
-              </button>
-            </div>
-            {followError && (
-              <p role="alert" className="mt-3 text-sm text-red-700">
-                {followError}
-              </p>
-            )}
-          </header>
+        <div
+          ref={mobileSupportRef}
+          className={`${card} mt-5 p-6 shadow-[0_12px_32px_-18px_rgba(23,25,24,0.25)] lg:mt-6 lg:rounded-[28px] lg:p-8`}
+        >
+          {open ? (
+            // Checkout happens in the card itself: no popup.
+            <SupportModal
+              inline
+              channel={channel}
+              value={support}
+              onChange={setSupport}
+              onClose={closeSupport}
+              onBlessing={addBlessing}
+              blessingsEnabled={data.showBlessings}
+              config={config}
+              presets={presets}
+              signedIn={signedIn}
+            />
+          ) : (
+            <>
+              <SupportForm
+                channel={channel}
+                value={support}
+                onChange={setSupport}
+                onContinue={openSupport}
+                config={config}
+                presets={presets}
+              />
+              {data.showTopSupporters && <TopSupporters supporters={data.topSupporters} />}
+            </>
+          )}
+        </div>
 
+        {/* Same container as the card, so both are exactly the same width */}
+        {data.showRecentSupporters && (
+          <RecentSupporters handle={channel.handle} initial={data.recentSupporters} initialCursor={data.recentNextCursor} />
+        )}
+      </section>
+
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-10">
+        {/* ----- Main column ----- */}
+        <div className="min-w-0">
           <TabBar showBlessings={data.showBlessings} />
 
           {/* About */}
           <section id="about" className="scroll-mt-16 pt-14">
             <span className={eyebrow}>About</span>
             <h2 className={h2}>About {channel.name}</h2>
-            <div className="mt-6 max-w-2xl space-y-5 text-lg leading-[1.75] text-charcoal-deep/85">
+            <div className="mt-6 max-w-2xl space-y-5 text-lg leading-[1.75] text-charcoal-deep/85 lg:max-w-4xl lg:text-xl">
               {data.about.map((p) => (
                 <p key={p}>{p}</p>
               ))}
             </div>
-            <div className="mt-8 max-w-2xl rounded-[18px] bg-cream p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-deep/60">
+            <div className="mt-8 max-w-2xl rounded-[18px] bg-cream p-6 lg:max-w-4xl lg:p-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-deep/60 lg:text-sm">
                 Mission
               </p>
-              <p className="mt-2 text-lg leading-relaxed text-charcoal-deep">
+              <p className="mt-2 text-lg leading-relaxed text-charcoal-deep lg:text-xl">
                 {data.mission}
               </p>
             </div>
@@ -1152,13 +1196,13 @@ export function ChannelProfile({
                     </div>
                   )}
                   <div className="p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bless-deep">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-bless-deep lg:text-sm">
                       {c.kind}
                     </p>
-                    <h3 className="mt-2 text-lg font-semibold leading-snug tracking-tight text-charcoal-deep">
+                    <h3 className="mt-2 text-lg font-semibold leading-snug tracking-tight text-charcoal-deep lg:text-xl">
                       {c.title}
                     </h3>
-                    <p className="mt-4 text-xs text-slate">
+                    <p className="mt-4 text-xs text-slate lg:text-sm">
                       {formatDate(c.date)}
                     </p>
                   </div>
@@ -1234,35 +1278,18 @@ export function ChannelProfile({
             <ul className="mt-8 grid gap-5 sm:grid-cols-3">
               {HELPS.map(([title, text], i) => (
                 <li key={title} className="border-t-2 border-charcoal-deep pt-4">
-                  <span className="text-xs font-semibold text-slate">
+                  <span className="text-xs font-semibold text-slate lg:text-sm">
                     0{i + 1}
                   </span>
-                  <h3 className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-deep">
+                  <h3 className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-charcoal-deep lg:text-sm">
                     {title}
                   </h3>
-                  <p className="mt-2 leading-relaxed text-slate">{text}</p>
+                  <p className="mt-2 leading-relaxed text-slate lg:text-lg">{text}</p>
                 </li>
               ))}
             </ul>
           </section>
         </div>
-
-        {/* ----- Sticky support card (desktop) ----- */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-6 mt-6">
-            <div className={`${card} p-7 shadow-[0_12px_32px_-18px_rgba(23,25,24,0.25)]`}>
-              <SupportForm
-                channel={channel}
-                value={support}
-                onChange={setSupport}
-                onContinue={openSupport}
-              config={config}
-                presets={presets}
-              />
-              {data.showTopSupporters && <TopSupporters supporters={data.topSupporters} />}
-            </div>
-          </div>
-        </aside>
       </div>
 
       {/* Final CTA */}
@@ -1316,20 +1343,6 @@ export function ChannelProfile({
           </span>
         </OriginButton>
       </div>
-
-      {open && (
-        <SupportModal
-          channel={channel}
-          value={support}
-          onChange={setSupport}
-          onClose={closeSupport}
-          onBlessing={addBlessing}
-          blessingsEnabled={data.showBlessings}
-          config={config}
-          presets={presets}
-          signedIn={follow.signedIn}
-        />
-      )}
     </div>
   );
 }

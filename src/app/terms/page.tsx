@@ -26,9 +26,9 @@ export default function TermsPage() {
           title: "Donations",
           body: (
             <p>
-              Giving is voluntary and goes to the channel you choose. Donations are processed by Stripe. Signed-in
-              members can request a refund of a gift from their account page; it is returned to the original
-              payment method. Chosen Prayer does not guarantee how a channel uses
+              Giving is voluntary and goes to the channel you choose. Donations are processed by Stripe. You can
+              request a refund within 7 days of a gift, from your account page or the link in your receipt email;
+              it is returned to the original payment method. Chosen Prayer does not guarantee how a channel uses
               funds.
             </p>
           ),

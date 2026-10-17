@@ -64,6 +64,12 @@ export type TopSupporter = {
   total: number; // whole currency units given to this channel (succeeded donations only)
 };
 
+export type RecentSupporter = {
+  name: string; // "Anonymous" when the supporter has no name or chose privacy
+  amount: number; // whole currency units
+  paidAt: string; // ISO timestamp; the page turns it into "5 minutes ago"
+};
+
 export type ChannelProfileData = {
   /** Link to the channel on YouTube ("View all content"); absent when none is linked. */
   youtubeUrl?: string;
@@ -78,6 +84,11 @@ export type ChannelProfileData = {
   /** False when the site-wide Top Supporters list is switched off (the default); nothing is shown then. */
   showTopSupporters: boolean;
   topSupporters: TopSupporter[];
+  /** False when the site-wide Recent Supporters list is switched off; the section is then hidden. */
+  showRecentSupporters: boolean;
+  recentSupporters: RecentSupporter[];
+  /** Opaque cursor for "Load more"; null when the first page was all there is. */
+  recentNextCursor: string | null;
   /** Quick-pick amounts on the Support card (site-wide, set in Admin > Channels > Support settings). */
   givingPresets: number[];
 };
@@ -91,6 +102,19 @@ const full = new Intl.NumberFormat("en");
 export const formatFollowers = (n: number) =>
   n >= 1000 ? compact.format(n) : full.format(n);
 export const formatSupporters = (n: number) => full.format(n);
+
+/** "just now", "5 minutes ago", "3 hours ago", "2 days ago"; falls back to the date after a month. */
+export function timeAgo(iso: string, now: number = Date.now()): string {
+  const secs = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(secs / 3600);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(secs / 86400);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return formatDate(iso.slice(0, 10));
+}
 
 export const formatDate = (iso: string) =>
   new Date(iso + "T00:00:00Z").toLocaleDateString("en", {
