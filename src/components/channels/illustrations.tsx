@@ -145,3 +145,9 @@ export function EmptyIllustration() {
     </div>
   );
 }
+
+/** An uploaded cover photo, filling its (relative, overflow-hidden) parent in place of the generated scene. */
+export function CoverPhoto({ url }: { url: string }) {
+  // eslint-disable-next-line @next/next/no-img-element -- served from Supabase Storage's CDN
+  return <img src={url} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" />;
+}

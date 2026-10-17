@@ -89,7 +89,7 @@ export async function listMyFollowing(
     id: string; handle: string; name: string; description: string; category: string; category_slug: string;
     follower_count: number; supporter_count: number; youtube_subscribers: string | null; created_raw: string; followed_raw: string;
     cover_tone: ChannelSummary["cover"]["tone"]; cover_scene: ChannelSummary["cover"]["scene"];
-    avatar_path: string | null; featured: boolean; verified: boolean;
+    avatar_path: string | null; cover_path: string | null; featured: boolean; verified: boolean;
   };
   let fetched: Row[];
   try {
@@ -98,7 +98,7 @@ export async function listMyFollowing(
               c.follower_count, c.supporter_count, c.youtube_subscribers::text as youtube_subscribers,
               to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as created_raw,
               to_char(f.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as followed_raw,
-              c.cover_tone, c.cover_scene, c.avatar_path, c.featured, c.verified
+              c.cover_tone, c.cover_scene, c.avatar_path, c.cover_path, c.featured, c.verified
        from public.channel_follows f
        join public.channels c on c.id = f.channel_id
        join public.categories cat on cat.slug = c.category
@@ -128,6 +128,7 @@ export async function listMyFollowing(
       createdAt: new Date(r.created_raw).toISOString(),
       cover: { tone: r.cover_tone, scene: r.cover_scene },
       avatarUrl: channelImageUrl(r.avatar_path),
+      coverUrl: channelImageUrl(r.cover_path),
       featured: r.featured,
       verified: r.verified,
     })),

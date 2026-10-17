@@ -33,7 +33,9 @@ const form = ref({
   verified: false,
   showBlessings: true,
   avatarPath: null as string | null,
-  avatarUrl: null as string | null
+  avatarUrl: null as string | null,
+  coverPath: null as string | null,
+  coverUrl: null as string | null
 });
 const youtubeInput = ref('');
 const youtube = ref<YoutubePreview | null>(null);
@@ -94,7 +96,8 @@ async function save(e: Event) {
       featured: f.featured,
       verified: f.verified,
       showBlessings: f.showBlessings,
-      avatarPath: f.avatarPath
+      avatarPath: f.avatarPath,
+      coverPath: f.coverPath
     });
     router.push(`/channels/${created.id}`);
   } catch (err) {
@@ -139,6 +142,7 @@ async function save(e: Event) {
             <v-alert v-if="fieldErrors.youtubeChannel" type="error" variant="tonal" class="mt-3">{{ fieldErrors.youtubeChannel }}</v-alert>
           </div>
           <ImageUpload label="Channel image (profile picture)" shape="avatar" :path="form.avatarPath" :url="form.avatarUrl" hint="Square works best. Shown on cards and the channel page." @change="(v) => { form.avatarPath = v.path; form.avatarUrl = v.url; }" />
+          <ImageUpload label="Cover image" shape="cover" :path="form.coverPath" :url="form.coverUrl" hint="Wide image, about 1600 × 600. Leave empty to use the generated cover." @change="(v) => { form.coverPath = v.path; form.coverUrl = v.url; }" />
           <v-text-field variant="outlined" rounded="0" density="comfortable" v-model="form.handle" label="Handle (the web address)" prefix="@" hint="3–30 letters, numbers or underscores. It cannot be changed later." persistent-hint :error-messages="fieldErrors.handle" class="mb-3" />
           <v-text-field variant="outlined" rounded="0" density="comfortable" v-model="form.name" label="Channel name" :error-messages="fieldErrors.name" class="mb-3" />
           <v-select variant="outlined" rounded="0" density="comfortable" v-model="form.category" :items="categories" item-title="name" item-value="slug" label="Category" :error-messages="fieldErrors.category" class="mb-3" />

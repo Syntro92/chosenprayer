@@ -20,7 +20,9 @@ interface Channel {
   coverTone: string;
   coverScene: string;
   avatarPath: string | null;
+  coverPath: string | null;
   avatarUrl: string | null;
+  coverUrl: string | null;
   status: 'pending' | 'active' | 'paused' | 'archived';
   featured: boolean;
   verified: boolean;
@@ -48,7 +50,7 @@ const saving = ref(false);
 const saved = ref(false);
 const saveError = ref('');
 const fieldErrors = ref<Record<string, string>>({});
-const form = ref({ name: '', description: '', mission: '', about: '', category: '', coverTone: 'cream', coverScene: 'horizon', featured: false, verified: false, showBlessings: true, avatarPath: null as string | null, avatarUrl: null as string | null });
+const form = ref({ name: '', description: '', mission: '', about: '', category: '', coverTone: 'cream', coverScene: 'horizon', featured: false, verified: false, showBlessings: true, avatarPath: null as string | null, avatarUrl: null as string | null, coverPath: null as string | null, coverUrl: null as string | null });
 
 function fill(c: Channel) {
   channel.value = c;
@@ -64,7 +66,9 @@ function fill(c: Channel) {
     verified: c.verified,
     showBlessings: c.showBlessings,
     avatarPath: c.avatarPath,
-    avatarUrl: c.avatarUrl
+    avatarUrl: c.avatarUrl,
+    coverPath: c.coverPath,
+    coverUrl: c.coverUrl
   };
 }
 
@@ -103,7 +107,8 @@ async function save(e: Event) {
         featured: f.featured,
         verified: f.verified,
         showBlessings: f.showBlessings,
-        avatarPath: f.avatarPath
+        avatarPath: f.avatarPath,
+        coverPath: f.coverPath
       })
     );
     saved.value = true;
@@ -209,6 +214,7 @@ async function changeStatus(note: string) {
       <UiParentCard title="Edit details">
         <v-form @submit="save">
           <ImageUpload label="Channel image (profile picture)" shape="avatar" :path="form.avatarPath" :url="form.avatarUrl" hint="Square works best. Shown on cards and the channel page." @change="(v) => { form.avatarPath = v.path; form.avatarUrl = v.url; }" />
+          <ImageUpload label="Cover image" shape="cover" :path="form.coverPath" :url="form.coverUrl" hint="Wide image, about 1600 × 600. Leave empty to use the generated cover." @change="(v) => { form.coverPath = v.path; form.coverUrl = v.url; }" />
           <v-text-field v-model="form.name" label="Channel name" :error-messages="fieldErrors.name" class="mb-3" />
           <v-select v-model="form.category" :items="categories" item-title="name" item-value="slug" label="Category" :error-messages="fieldErrors.category" class="mb-3" />
           <v-text-field v-model="form.description" label="One-line summary" counter="200" maxlength="200" class="mb-3" />

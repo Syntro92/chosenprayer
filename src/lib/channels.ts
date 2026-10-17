@@ -5,7 +5,7 @@
 export type CoverTone = "cream" | "mist" | "sage" | "stone";
 export type CoverScene = "horizon" | "hills" | "sun" | "waves";
 
-/** Public Supabase Storage bucket holding channel profile pictures. */
+/** Public Supabase Storage bucket holding channel profile pictures and cover images. */
 export const CHANNEL_IMAGE_BUCKET = "channel-images";
 export const CHANNEL_IMAGE_MAX_BYTES = 4 * 1024 * 1024; // stays under the 4.5 MB serverless request limit
 export const CHANNEL_IMAGE_EXTS = [".jpg", ".png", ".webp"] as const;
@@ -32,8 +32,9 @@ export type Channel = {
   subscribers?: number | null;
   createdAt: string; // ISO timestamp, used for "Newest"
   cover: { tone: CoverTone; scene: CoverScene };
-  /** Uploaded profile picture. Absent: the initial-letter avatar is shown. */
+  /** Uploaded profile picture / cover photo. Absent: the initial-letter avatar and generated cover are shown. */
   avatarUrl?: string | null;
+  coverUrl?: string | null;
   featured?: boolean;
   verified?: boolean;
 };

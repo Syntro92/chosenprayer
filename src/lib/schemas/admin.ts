@@ -51,6 +51,7 @@ export const createChannelSchema = z.object({
   handle,
   ...channelFields,
   avatarPath: imagePath.nullish(),
+  coverPath: imagePath.nullish(),
   /** Defaults to active: an admin creating a channel is the approval. */
   status: z.enum(CHANNEL_STATUSES).default("active"),
   /** Optional: the member who runs this channel. */
@@ -74,6 +75,7 @@ export const updateChannelSchema = z
     coverTone: z.enum(["cream", "mist", "sage", "stone"]),
     coverScene: z.enum(["horizon", "hills", "sun", "waves"]),
     avatarPath: imagePath.nullable(),
+    coverPath: imagePath.nullable(),
     featured: z.boolean(),
     verified: z.boolean(),
     showBlessings: z.boolean(),

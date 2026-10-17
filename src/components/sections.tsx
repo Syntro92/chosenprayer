@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { TONE_CLASS } from "@/components/channels/illustrations";
+import { CoverPhoto, TONE_CLASS } from "@/components/channels/illustrations";
 import { formatFollowers } from "@/lib/channels";
 import { listChannelsPublic } from "@/server/cache/channels";
 import { getBlessingsCountCached } from "@/server/cache/site";
@@ -174,7 +174,7 @@ export async function ExploreChannels() {
               <div
                 className={`relative h-44 bg-gradient-to-br sm:h-52 ${TONE_CLASS[c.cover.tone]}`}
               >
-                <CoverArt />
+                {c.coverUrl ? <CoverPhoto url={c.coverUrl} /> : <CoverArt />}
               </div>
               <div className="relative px-7 pb-7">
                 <div className="-mt-10 flex size-20 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-charcoal-deep text-2xl font-semibold text-bless">

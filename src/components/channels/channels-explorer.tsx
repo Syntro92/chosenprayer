@@ -6,7 +6,7 @@ import {
   formatFollowers,
   type Channel,
 } from "@/lib/channels";
-import { CoverArt, EmptyIllustration, TONE_CLASS } from "./illustrations";
+import { CoverArt, CoverPhoto, EmptyIllustration, TONE_CLASS } from "./illustrations";
 
 const focus =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-deep focus-visible:ring-offset-2";
@@ -114,7 +114,7 @@ function ChannelCard({ channel }: { channel: Channel }) {
         <div
           className={`absolute inset-0 bg-gradient-to-br transition-transform duration-500 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100 ${TONE_CLASS[channel.cover.tone]}`}
         >
-          <CoverArt scene={channel.cover.scene} />
+          {channel.coverUrl ? <CoverPhoto url={channel.coverUrl} /> : <CoverArt scene={channel.cover.scene} />}
         </div>
       </div>
       <div className="flex flex-1 flex-col px-6 pb-6">
@@ -155,7 +155,7 @@ function FeaturedChannel({ channel }: { channel: Channel }) {
           <div
             className={`absolute inset-0 bg-gradient-to-br transition-transform duration-700 ease-out group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100 ${TONE_CLASS[channel.cover.tone]}`}
           >
-            <CoverArt scene={channel.cover.scene} />
+            {channel.coverUrl ? <CoverPhoto url={channel.coverUrl} /> : <CoverArt scene={channel.cover.scene} />}
           </div>
         </div>
         <div className="flex flex-col justify-center px-6 pb-8 sm:px-10 md:py-12">
