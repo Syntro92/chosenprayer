@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { getPool, type Queryable } from "@/server/db";
 import { getEnv } from "@/server/env";
 import type { PaymentEvent } from "@/server/providers/payments";
@@ -58,9 +58,12 @@ const outbox = async (c: Queryable, to?: string) =>
 
 /* ======================================================================== */
 describe("getGivingConfig", () => {
-  it("reports test mode and the limits", async () => {
-    expect(await getGivingConfig()).toMatchObject({ provider: "mock", available: true, recurring: true, minAmount: 25, maxAmount: 999_999 });
-  });
+  it("reports test mode and the limits", () =>
+    withRollback(async (c) => {
+      // The real minimum is an admin setting; pin the default so the test doesn't depend on it.
+      await c.query("update public.site_settings set min_donation = default where id", []);
+      expect(await getGivingConfig(c)).toMatchObject({ provider: "mock", available: true, recurring: true, minAmount: 25, maxAmount: 999_999 });
+    }));
 });
 
 describe("startDonation", () => {
@@ -704,6 +707,9 @@ describe("sweepStaleDonations", () => {
 
 /* ======================================================================== */
 describe("blessings", () => {
+  // The supporter-ranking tests create many paid donations, each a few round trips to the hosted DB.
+  vi.setConfig({ testTimeout: 90_000 });
+
   it("a guest can leave one with their token; name and amount follow their choices", () =>
     withRollback(async (c) => {
       const owner = await member(c);

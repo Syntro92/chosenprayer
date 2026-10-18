@@ -921,41 +921,31 @@ function RecentSupporters({
   );
 }
 
-/** Thumbnail with a play button; loads the player only after a click. */
+/** Thumbnail with a play button; opens the video on YouTube in a new tab. */
 function YouTubeEmbed({ id, title }: { id: string; title: string }) {
-  const [playing, setPlaying] = useState(false);
   return (
     <div className="relative aspect-[16/10] overflow-hidden bg-charcoal-deep">
-      {playing ? (
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`}
-          title={title}
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowFullScreen
-          className="absolute inset-0 size-full"
+      <a
+        href={`https://www.youtube.com/watch?v=${id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Watch on YouTube: ${title}`}
+        className={`group/play absolute inset-0 ${focus}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
+          alt=""
+          loading="lazy"
+          className="size-full object-cover transition duration-500 group-hover/play:scale-105"
         />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setPlaying(true)}
-          aria-label={`Play video: ${title}`}
-          className={`group/play absolute inset-0 ${focus}`}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`}
-            alt=""
-            loading="lazy"
-            className="size-full object-cover transition duration-500 group-hover/play:scale-105"
-          />
-          <span className="absolute inset-0 bg-charcoal-deep/15" />
-          <span className="absolute left-1/2 top-1/2 flex size-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-bless shadow-lg transition group-hover/play:scale-110">
-            <svg viewBox="0 0 24 24" className="ml-0.5 size-6 text-charcoal-deep" fill="currentColor" aria-hidden>
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-        </button>
-      )}
+        <span className="absolute inset-0 bg-charcoal-deep/15" />
+        <span className="absolute left-1/2 top-1/2 flex size-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-bless shadow-lg transition group-hover/play:scale-110">
+          <svg viewBox="0 0 24 24" className="ml-0.5 size-6 text-charcoal-deep" fill="currentColor" aria-hidden>
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </span>
+      </a>
     </div>
   );
 }
