@@ -904,9 +904,6 @@ function RecentSupporters({
                     {now == null ? formatDate(s.paidAt.slice(0, 10)) : timeAgo(s.paidAt, now)}
                   </time>
                 </span>
-                <span className="rounded-full bg-cream px-3 py-1 text-sm font-semibold text-charcoal-deep lg:px-5 lg:py-1.5 lg:text-xl">
-                  {money(s.amount)}
-                </span>
               </li>
             );
           })}
