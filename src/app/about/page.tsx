@@ -6,27 +6,42 @@ import { CrowdIllustration } from "@/components/channels/illustrations";
 export const metadata: Metadata = {
   title: "About | Chosen Prayer",
   description:
-    "Chosen Prayer is a place to discover meaningful channels, connect with the work you value, and give something back.",
+    "Chosen Prayer is an independent Christian inspirational media platform sharing prayers, uplifting messages and biblical wisdom.",
 };
 
 /* ---------- Copy (easy to replace) ---------- */
 const PURPOSE = [
-  "Every day, people create things that inspire, encourage, teach and connect with others.",
-  "Sometimes their work means more to us than they know.",
-  "Chosen Prayer was created to make it simple for people to support the channels and creators that matter to them — voluntarily, directly and meaningfully.",
+  "At Chosen Prayer, we believe that every person deserves a moment of peace, a message of hope, and a reminder that they are never alone in their journey.",
+  "Our mission is to inspire hearts, strengthen faith, and bring encouragement to people around the world through the power of digital storytelling.",
+  "Through carefully created videos, meaningful reflections and uplifting messages, we aim to provide a welcoming space where people can find encouragement during life's challenges.",
 ];
 
 const STEPS = [
-  { n: "01", title: "Discover", text: "Find channels and people whose work speaks to you.", icon: "discover" },
-  { n: "02", title: "Connect", text: "Explore their work and become part of their community.", icon: "connect" },
-  { n: "03", title: "Support", text: "Give voluntarily when you want to help that work continue.", icon: "support" },
+  {
+    n: "01",
+    title: "Prayer & encouragement",
+    text: "Daily prayers, spiritual encouragement and inspiration for life's difficult moments.",
+    icon: "discover",
+  },
+  {
+    n: "02",
+    title: "Biblical wisdom",
+    text: "Christian motivational videos, biblical wisdom and reflections for personal growth.",
+    icon: "connect",
+  },
+  {
+    n: "03",
+    title: "Faith & hope",
+    text: "Faith-centered storytelling that encourages spiritual reflection and positive living.",
+    icon: "support",
+  },
 ] as const;
 
 const PRINCIPLES = [
-  { title: "Voluntary", text: "Giving should always be a choice.", icon: "voluntary" },
-  { title: "Meaningful", text: "Support should come from genuine connection.", icon: "meaningful" },
-  { title: "Direct", text: "People should be able to choose who they support.", icon: "direct" },
-  { title: "Community", text: "Small acts of support become powerful when people come together.", icon: "community" },
+  { title: "Voluntary", text: "Financial support is entirely optional, and public content stays free.", icon: "voluntary" },
+  { title: "Transparent", text: "We are clear about who we are, how payments work and what support does.", icon: "meaningful" },
+  { title: "Respectful", text: "Responsible publishing and a positive, encouraging online environment.", icon: "direct" },
+  { title: "Community", text: "Kindness, compassion and spiritual inspiration shared across borders.", icon: "community" },
 ] as const;
 
 /* ---------- Styles ---------- */
@@ -139,9 +154,9 @@ export default function AboutPage() {
             className="rise-in mt-7 max-w-2xl text-base leading-relaxed text-slate sm:text-xl"
             style={{ "--d": "160ms" } as CSSProperties}
           >
-            Chosen Prayer is a place where people can discover meaningful
-            channels, connect with the work they value, and give something
-            back.
+            Faith. Hope. Inspiration. A journey closer to God. Chosen Prayer is
+            an independent Christian inspirational media platform sharing
+            prayers, uplifting messages and biblical wisdom.
           </p>
         </section>
         <div className="mx-auto mt-10 h-36 w-full max-w-3xl overflow-hidden sm:mt-14 sm:h-44">
@@ -153,7 +168,7 @@ export default function AboutPage() {
           <div className="grid gap-10 border-t border-line pt-12 md:grid-cols-[1fr_1.1fr] md:gap-20 md:pt-16">
             <div>
               <span className={eyebrow}>Our purpose</span>
-              <h2 className={`mt-4 max-w-md ${h2}`}>Why we built Chosen Prayer</h2>
+              <h2 className={`mt-4 max-w-md ${h2}`}>Our mission</h2>
             </div>
             <div className="space-y-6 text-lg leading-relaxed text-charcoal-deep/80 sm:text-xl">
               {PURPOSE.map((p, i) => (
@@ -183,16 +198,17 @@ export default function AboutPage() {
               <path d="M0 148c70-24 130-24 190 0s130 20 210-6" />
             </svg>
             <div className="relative mx-auto max-w-3xl">
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-bless">The idea</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-bless">Our vision</span>
               <h2 className="mt-5 text-3xl font-semibold leading-[1.12] tracking-tight text-white sm:text-5xl">
-                When something means something,
+                Uplifting messages of faith and hope,
                 <br className="hidden sm:block" />{" "}
-                <span className="text-bless">give something back.</span>
+                <span className="text-bless">for everyone.</span>
               </h2>
               <p className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-white/75 sm:text-lg">
-                Support doesn&apos;t always have to be complicated. Chosen Prayer
-                brings people and meaningful work together, giving communities
-                a simple way to show appreciation and help that work continue.
+                We envision a world where uplifting messages of faith and hope
+                can reach people regardless of geographical boundaries, and a
+                positive community built around kindness, encouragement,
+                compassion and spiritual inspiration.
               </p>
             </div>
           </div>
@@ -201,8 +217,8 @@ export default function AboutPage() {
         {/* How it works */}
         <section className={`${wrap} mt-24 sm:mt-36`}>
           <div className="max-w-xl">
-            <span className={eyebrow}>How Chosen Prayer works</span>
-            <h2 className={`mt-4 ${h2}`}>Three simple steps.</h2>
+            <span className={eyebrow}>What we create</span>
+            <h2 className={`mt-4 ${h2}`}>Content for every season of life.</h2>
           </div>
           <ol className="mt-12 grid gap-5 md:grid-cols-3">
             {STEPS.map((s) => (
@@ -222,7 +238,7 @@ export default function AboutPage() {
 
         {/* Principles */}
         <section className={`${wrap} mt-24 sm:mt-36`}>
-          <h2 className={`max-w-xl ${h2}`}>What we believe</h2>
+          <h2 className={`max-w-xl ${h2}`}>Our commitment</h2>
           <div className="mt-12 grid gap-x-12 gap-y-10 border-t border-line pt-10 sm:grid-cols-2">
             {PRINCIPLES.map((p) => (
               <div key={p.title} className="flex gap-5">
@@ -243,11 +259,18 @@ export default function AboutPage() {
         {/* Community */}
         <section className="mt-24 overflow-hidden sm:mt-36">
           <div className={`${wrap} flex max-w-3xl flex-col items-center text-center`}>
-            <h2 className={h2}>Many voices. One community.</h2>
+            <h2 className={h2}>Support our creative work.</h2>
             <p className="mt-6 max-w-2xl text-base leading-relaxed text-slate sm:text-lg">
-              Every channel is different. Every supporter has a different
-              reason for being here. What connects them is the belief that
-              meaningful work is worth supporting.
+              Creating meaningful content takes time, creativity, research,
+              production and ongoing website maintenance. Visitors who
+              appreciate it may voluntarily support our work with one-time
+              contributions that help fund video production, editing and
+              publishing.
+            </p>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate sm:text-base">
+              Support is entirely optional and our public content stays
+              accessible without it. Contributions are voluntary creator-support
+              payments and are not tax-deductible charitable donations.
             </p>
           </div>
           <div className="mx-auto mt-14 h-52 max-w-5xl overflow-hidden sm:h-72">
@@ -258,19 +281,21 @@ export default function AboutPage() {
         {/* Final CTA */}
         <section className="bg-cream py-20 sm:py-28">
           <div className={`${wrap} flex max-w-3xl flex-col items-center text-center`}>
-            <h2 className={h2}>Find something worth supporting.</h2>
+            <h2 className={h2}>Be part of the journey.</h2>
             <p className="mt-5 text-base leading-relaxed text-charcoal-deep/75 sm:text-lg">
-              Explore channels and discover the people, ideas and communities
-              that matter to you.
+              Together, we can continue sharing faith, hope and encouragement.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/channels" className={primaryBtn}>
                 Explore Channels
               </Link>
-              <Link href="/how-it-works" className={secondaryBtn}>
-                How It Works
+              <Link href="/contact" className={secondaryBtn}>
+                Contact Us
               </Link>
             </div>
+            <p className="mt-8 text-xs text-slate">
+              Chosen Prayer is an independent Christian inspirational media platform operated by SYNTRO SOLUTIONS LLC.
+            </p>
           </div>
         </section>
       </main>
