@@ -116,7 +116,6 @@ describe("SupportModal: confirm step", () => {
     await toConfirm(user);
     expect(screen.getByLabelText(/Email for your receipt/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Your name/)).toBeInTheDocument();
-    expect(screen.getByText(/Test mode/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send $25" })).toBeInTheDocument();
   });
   it("doesn't ask signed-in members for anything", async () => {
@@ -129,16 +128,11 @@ describe("SupportModal: confirm step", () => {
     await toConfirm(user);
     expect(screen.getByRole("button", { name: "Send $25/mo" })).toBeInTheDocument();
   });
-  it("doesn't mention test mode for a live provider", async () => {
-    const { user } = setup({ config: { ...config, provider: "stripe", testMode: false, publishableKey: "pk_live_x" } });
-    await toConfirm(user);
-    expect(screen.queryByText(/Test mode/)).not.toBeInTheDocument();
-  });
-  it("a Stripe sandbox says test mode and shows the test card", async () => {
+  it("never shows a test-mode notice, even on a Stripe sandbox", async () => {
     const { user } = setup({ config: { ...config, provider: "stripe", testMode: true, publishableKey: "pk_test_x" } });
     await toConfirm(user);
-    expect(screen.getByText(/Test mode/)).toBeInTheDocument();
-    expect(screen.getByText(/4242 4242 4242 4242/)).toBeInTheDocument();
+    expect(screen.queryByText(/Test mode/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/4242 4242 4242 4242/)).not.toBeInTheDocument();
   });
   it("won't send a guest gift without an email, and never calls the server", async () => {
     const { user } = setup();

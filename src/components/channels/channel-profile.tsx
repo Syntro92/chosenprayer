@@ -559,12 +559,6 @@ export function SupportModal({
               </div>
             )}
 
-            {config?.testMode && (
-              <p className={`mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep ${L("lg:px-6 lg:py-4 lg:text-lg")}`}>
-                <span className="font-semibold">Test mode.</span> This is a practice payment. No real money moves.
-                {config.provider === "stripe" && " Use the test card 4242 4242 4242 4242, any future date and any CVC."}
-              </p>
-            )}
             <p className={`mt-4 text-sm text-slate ${L("lg:text-lg")}`}>
               Your contribution is voluntary. Secure payment with Stripe.
             </p>
@@ -599,11 +593,6 @@ export function SupportModal({
               {money(amount)}
               {value.frequency === "monthly" ? " every month" : ""} to {channel.name}
             </p>
-            {config.testMode && (
-              <p className={`mt-4 rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep ${L("lg:px-6 lg:py-4 lg:text-lg")}`}>
-                <span className="font-semibold">Test mode.</span> No real money moves. Use the test card 4242 4242 4242 4242, any future date and any CVC.
-              </p>
-            )}
             {cardPaid ? (
               <div className="mt-6">
                 <p role="status" className="rounded-xl bg-cream px-4 py-3 text-sm text-charcoal-deep">
