@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { uuidSchema } from "@/lib/schemas/community";
 import { authAdmin, type AuthAdmin } from "../auth/auth-admin";
-import { canModerateRole, requireRole, type Actor, type Role } from "../auth/policy";
+import { canEditRole, canModerateRole, requireRole, type Actor, type Role } from "../auth/policy";
 import { db, inTransaction, one, rows, type Queryable } from "../db";
 import { AppError } from "../errors";
 import { clampLimit, decodeCursor, encodeCursor } from "../pagination";
@@ -391,6 +391,7 @@ export async function suspendUser(
   await inTransaction(conn, async (c) => {
     const u = await loadUser(userId, c);
     if (u.id === a.userId) throw new AppError("VALIDATION", "You can't suspend yourself.");
+    if (u.role === "owner") throw new AppError("FORBIDDEN", "Owners can't be suspended.");
     if (u.role === "admin") throw new AppError("FORBIDDEN", "Admins can't be suspended. Change their role first.");
     if (u.status === "suspended") throw new AppError("CONFLICT", "That member is already suspended.");
 
@@ -430,6 +431,7 @@ export async function setRole(actor: Actor | null, userId: string, raw: unknown,
   await inTransaction(conn, async (c) => {
     const u = await loadUser(userId, c);
     if (u.id === a.userId) throw new AppError("VALIDATION", "You can't change your own role.");
+    if (!canEditRole(a.role, u.role)) throw new AppError("FORBIDDEN", "Only an owner can edit an owner.");
     if (u.role === role) return;
     await c.query("update public.profiles set role = $2 where id = $1", [u.id, role]);
     await audit(c, {

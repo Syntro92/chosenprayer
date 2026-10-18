@@ -6,7 +6,7 @@ export interface AdminMe {
   id: string;
   name: string;
   username: string;
-  role: 'admin';
+  role: 'admin' | 'owner';
   /** Signed in with an admin-issued temporary password: only the change-password page is allowed. */
   mustChangePassword: boolean;
 }
@@ -22,7 +22,7 @@ export const useAuthStore = defineStore('auth', {
     returnUrl: null as string | null
   }),
   getters: {
-    isAdmin: (s) => s.user?.role === 'admin'
+    isAdmin: (s) => s.user?.role === 'admin' || s.user?.role === 'owner'
   },
   actions: {
     /** Asks the server who we are (once per page load). */

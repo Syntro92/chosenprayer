@@ -312,8 +312,9 @@ export async function deleteMyAccount(ctx: AuthContext, actor: Actor | null, raw
     throw new AppError("VALIDATION", "Incorrect password.", { fields: { password: "Incorrect password" } });
   }
 
+  if (a.role === "owner") throw new AppError("FORBIDDEN", "An owner account can't be deleted.");
   if (a.role === "admin") {
-    const admins = await one<{ n: number }>("select count(*) as n from public.profiles where role = 'admin' and status = 'active'");
+    const admins = await one<{ n: number }>("select count(*) as n from public.profiles where role in ('admin', 'owner') and status = 'active'");
     if ((admins?.n ?? 0) <= 1) {
       throw new AppError("CONFLICT", "You're the only admin. Make someone else an admin before deleting your account.");
     }

@@ -3,7 +3,7 @@ import { AppError } from "../errors";
 // Pure permission rules (no I/O) so they are trivially unit-testable.
 // No "server-only": the Actor type is safe to share.
 
-export type Role = "member" | "admin";
+export type Role = "member" | "admin" | "owner";
 export type AccountStatus = "active" | "suspended";
 
 /** Who is making a request. `null` everywhere means "anonymous visitor". */
@@ -19,9 +19,9 @@ export interface Actor {
   mustChangePassword?: boolean;
 }
 
-const RANK: Record<Role, number> = { member: 1, admin: 2 };
+const RANK: Record<Role, number> = { member: 1, admin: 2, owner: 3 };
 
-/** admin >= member. */
+/** owner >= admin >= member. */
 export function hasRole(actor: Actor | null, min: Role): boolean {
   return !!actor && actor.status === "active" && RANK[actor.role] >= RANK[min];
 }
@@ -48,9 +48,14 @@ export function requireOwnerOrRole(actor: Actor | null, ownerId: string | null |
 }
 
 /**
- * Who may act on whose content: admins on members only.
- * Nobody moderates an admin (an admin must be demoted by another admin first).
+ * Who may act on whose content: admins and owners on members only.
+ * Nobody moderates an admin or an owner (an admin must be demoted first).
  */
 export function canModerateRole(actorRole: Role, targetRole: Role): boolean {
-  return actorRole === "admin" && targetRole !== "admin";
+  return RANK[actorRole] >= RANK.admin && targetRole === "member";
+}
+
+/** Owners can only be edited (role, verified badge, ...) by other owners. */
+export function canEditRole(actorRole: Role, targetRole: Role): boolean {
+  return targetRole !== "owner" || actorRole === "owner";
 }

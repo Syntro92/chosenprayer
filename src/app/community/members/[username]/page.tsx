@@ -33,7 +33,7 @@ async function Content({ params }: { params: Promise<{ username: string }> }) {
         initialCursor={page.nextCursor}
         // Only admins get account tools, and never over another admin or over themselves.
         admin={
-          hasRole(actor, "admin") && page.memberRole !== "admin" && page.member.id !== actor.userId
+          hasRole(actor, "admin") && page.memberRole === "member" && page.member.id !== actor.userId
             ? { status: page.memberStatus, role: page.memberRole }
             : undefined
         }

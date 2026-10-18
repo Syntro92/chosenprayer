@@ -14,7 +14,7 @@ interface User {
   username: string;
   email: string | null;
   bio: string;
-  role: 'member' | 'admin';
+  role: 'member' | 'admin' | 'owner';
   status: 'active' | 'suspended';
   verified: boolean;
   joinedAt: string;
@@ -62,6 +62,8 @@ async function saveRole() {
   savingRole.value = false;
 }
 const isMe = () => user.value?.id === me.user?.id;
+// Owners can only be edited by other owners.
+const lockedOwner = () => user.value?.role === 'owner' && me.user?.role !== 'owner';
 const describe = (h: User['history'][number]) => {
   const m = h.metadata as Record<string, any>;
   switch (h.action) {
@@ -107,14 +109,15 @@ const describe = (h: User['history'][number]) => {
       <UiParentCard title="Manage account">
         <v-alert v-if="actionError" type="error" variant="tonal" class="mb-4">{{ actionError }}</v-alert>
         <div class="d-flex align-center ga-3 mb-2">
-          <v-select v-model="role" :items="['member', 'admin']" label="Role" density="comfortable" hide-details :disabled="isMe()" style="max-width: 220px" />
-          <v-btn color="primary" variant="flat" :disabled="role === user.role || isMe()" :loading="savingRole" @click="saveRole">Save role</v-btn>
+          <v-select v-model="role" :items="user.role === 'owner' ? ['owner', 'member', 'admin'] : ['member', 'admin']" label="Role" density="comfortable" hide-details :disabled="isMe() || lockedOwner()" style="max-width: 220px" />
+          <v-btn color="primary" variant="flat" :disabled="role === user.role || isMe() || lockedOwner()" :loading="savingRole" @click="saveRole">Save role</v-btn>
         </div>
         <div v-if="isMe()" class="text-caption text-disabled mb-2">You can’t change your own role or suspend yourself.</div>
-        <v-switch :model-value="user.verified" label="Verified badge" color="primary" hide-details density="compact" class="mb-3" @update:model-value="(v: any) => run({ verified: !!v })" />
-        <v-btn v-if="user.status === 'active'" color="error" variant="flat" :disabled="isMe() || user.role === 'admin'" @click="suspendDialog = true">Suspend account</v-btn>
-        <v-btn v-else color="success" variant="flat" @click="run({ status: 'active' })">Lift suspension</v-btn>
-        <div v-if="user.role === 'admin' && !isMe()" class="text-caption text-disabled mt-2">Admins can’t be suspended. Change their role first.</div>
+        <v-switch :model-value="user.verified" label="Verified badge" color="primary" hide-details density="compact" class="mb-3" :disabled="lockedOwner()" @update:model-value="(v: any) => run({ verified: !!v })" />
+        <v-btn v-if="user.status === 'active'" color="error" variant="flat" :disabled="isMe() || user.role === 'admin' || user.role === 'owner'" @click="suspendDialog = true">Suspend account</v-btn>
+        <v-btn v-else color="success" variant="flat" :disabled="lockedOwner()" @click="run({ status: 'active' })">Lift suspension</v-btn>
+        <div v-if="user.role === 'owner' && !isMe()" class="text-caption text-disabled mt-2">Owners can’t be suspended, and only an owner can edit them.</div>
+        <div v-else-if="user.role === 'admin' && !isMe()" class="text-caption text-disabled mt-2">Admins can’t be suspended. Change their role first.</div>
       </UiParentCard>
       <UiParentCard title="History" class="mt-6">
         <div v-if="!user.history.length" class="text-disabled">No admin actions on this account yet.</div>

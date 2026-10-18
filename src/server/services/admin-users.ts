@@ -2,7 +2,7 @@ import "server-only";
 import { adminUserListSchema, createUserSchema, updateUserSchema } from "@/lib/schemas/admin";
 import { uuidSchema } from "@/lib/schemas/community";
 import { authAdmin, authProvisioner, type AuthAdmin, type AuthProvisioner } from "../auth/auth-admin";
-import { requireRole, type Actor, type AccountStatus, type Role } from "../auth/policy";
+import { canEditRole, requireRole, type Actor, type AccountStatus, type Role } from "../auth/policy";
 import { db, inTransaction, one, rows, type Queryable } from "../db";
 import { AppError } from "../errors";
 import type { AdminPage } from "./admin-channels";
@@ -183,6 +183,8 @@ export async function updateAdminUser(
     conn,
   );
   if (!current) throw notFound();
+  if (!canEditRole(a.role, current.role)) throw new AppError("FORBIDDEN", "Only an owner can edit an owner.");
+  if (current.role === "owner" && patch.status === "suspended") throw new AppError("FORBIDDEN", "Owners can't be suspended.");
 
   if (patch.status === "suspended" && current.status !== "suspended" && !patch.reason?.trim()) {
     throw new AppError("VALIDATION", "Please give a reason for the suspension.", { fields: { reason: "Required when suspending" } });
