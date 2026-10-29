@@ -5,7 +5,8 @@ import { getPool, type Queryable } from "@/server/db";
 import { toAppError } from "@/server/errors";
 import { createAdminChannel, getAdminChannel, listAdminChannels, setChannelStatus, updateAdminChannel } from "@/server/services/admin-channels";
 import { getSettings, updateSettings } from "@/server/services/admin-config";
-import { getAnalytics, getDashboard, getHealth, getLiveVisitors } from "@/server/services/admin-insights";
+import { clearVisitCounter, getAnalytics, getDashboard, getHealth, getLiveVisitors } from "@/server/services/admin-insights";
+import { recordPageView, type Device } from "@/server/services/analytics";
 import { resolveReport } from "@/server/services/admin-reports";
 import { getAdminTransaction, listAdminTransactions } from "@/server/services/admin-transactions";
 import { updatePassword } from "@/server/services/accounts";
@@ -490,6 +491,29 @@ describe("dashboard, analytics, live and health", () => {
       expect(JSON.stringify(out)).not.toContain(v1); // full visitor ids are never exposed
       expect(out.hourly).toHaveLength(24);
       expect(out.hourly.at(-1)! - base.hourly.at(-1)!).toBeGreaterThanOrEqual(2);
+    }));
+
+  it("saved visit count grows with page views, counts a visitor once, skips bots and can be cleared", () =>
+    withRollback(async (c) => {
+      const a = await admin(c);
+      const base = (await getLiveVisitors(a, c)).counter;
+      const v1 = randomUUID();
+      const view = (visitor: string, device: Device = "desktop") => recordPageView({ visitorId: visitor, path: "/zz-count", referrer: null, country: null, device }, c);
+      await view(v1);
+      await view(v1);
+      await view(randomUUID());
+      await view(randomUUID(), "bot");
+      const grown = (await getLiveVisitors(a, c)).counter;
+      expect(grown.views - base.views).toBe(3);
+      expect(grown.visitors - base.visitors).toBe(2);
+
+      const cleared = await clearVisitCounter(a, c);
+      expect(cleared).toMatchObject({ views: 0, visitors: 0 });
+      await view(v1); // counted again after a clear
+      expect((await getLiveVisitors(a, c)).counter).toMatchObject({ views: 1, visitors: 1 });
+      const log = await listAuditLog(a, { entityType: "setting" }, c);
+      expect(log.items[0]).toMatchObject({ action: "visits.clear", entityId: "visit_counter" });
+      await expect(clearVisitCounter(await member(c), c)).rejects.toThrow();
     }));
 
   it("health reports the database, payment test mode, email backlog and cron freshness", () =>

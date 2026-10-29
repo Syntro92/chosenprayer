@@ -80,12 +80,21 @@ export interface PageViewInput {
   device: Device;
 }
 
-/** Stores one view. A `/channels/<handle>` path is linked to that channel when it exists. */
+/**
+ * Stores one view. A `/channels/<handle>` path is linked to that channel when it exists.
+ * Non-bot views also bump the saved visit counter (a visitor is counted once until it is cleared).
+ */
 export async function recordPageView(v: PageViewInput, conn: Queryable = db): Promise<void> {
   await conn.query(
     `insert into public.page_views (visitor_id, channel_id, path, referrer, country, device)
      values ($1, (select id from public.channels where handle = $5), $2, $3, $4, $6)`,
     [v.visitorId, v.path, v.referrer, v.country, channelHandle(v.path), v.device],
+  );
+  if (v.device === "bot") return;
+  await conn.query(
+    `with seen as (insert into public.visit_counter_visitors (visitor_id) values ($1) on conflict do nothing returning 1)
+     update public.visit_counter set views = views + 1, visitors = visitors + (select count(*) from seen) where id`,
+    [v.visitorId],
   );
 }
 

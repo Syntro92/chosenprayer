@@ -20,7 +20,8 @@ export type AuditAction =
   | "channel.create"
   | "channel.update"
   | "channel.status"
-  | "setting.update";
+  | "setting.update"
+  | "visits.clear";
 
 /**
  * Appends to the audit trail. Always called INSIDE the transaction of the action it

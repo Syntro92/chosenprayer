@@ -1,7 +1,8 @@
 import "server-only";
 import { analyticsQuerySchema, RANGES } from "@/lib/schemas/admin";
 import { requireRole, type Actor } from "../auth/policy";
-import { db, one, rows, type Queryable } from "../db";
+import { db, inTransaction, one, rows, type Queryable } from "../db";
+import { audit } from "./audit";
 import { countOpenReports } from "./moderation";
 import { listAdminTransactions, type AdminTransaction } from "./admin-transactions";
 
@@ -207,6 +208,39 @@ export interface LiveVisitors {
   topPaths: { path: string; visitors: number }[];
   /** Distinct visitors per hour for the last 24 hours, oldest first (24 entries). */
   hourly: number[];
+  counter: VisitCounter;
+}
+
+/** Saved totals since the last "Clear count" (not trimmed by the page-view retention). */
+export interface VisitCounter {
+  views: number;
+  visitors: number;
+  since: string;
+}
+
+async function readVisitCounter(conn: Queryable): Promise<VisitCounter> {
+  const r = await one<{ views: string; visitors: string; since: string }>(
+    "select views::text, visitors::text, since::text from public.visit_counter where id",
+    [],
+    conn,
+  );
+  return r ? { views: Number(r.views), visitors: Number(r.visitors), since: new Date(r.since).toISOString() } : { views: 0, visitors: 0, since: new Date().toISOString() };
+}
+
+/** Resets the saved counter to zero and starts counting again from now. Audited. */
+export async function clearVisitCounter(actor: Actor | null, conn: Queryable = db): Promise<VisitCounter> {
+  const a = requireRole(actor, "admin");
+  return inTransaction(conn, async (c) => {
+    const before = await readVisitCounter(c);
+    await c.query("delete from public.visit_counter_visitors");
+    await c.query(
+      `insert into public.visit_counter (id, views, visitors, since, cleared_by) values (true, 0, 0, now(), $1)
+       on conflict (id) do update set views = 0, visitors = 0, since = now(), cleared_by = $1`,
+      [a.userId],
+    );
+    await audit(c, { actorId: a.userId, action: "visits.clear", entityType: "setting", entityId: "visit_counter", metadata: { views: before.views, visitors: before.visitors, since: before.since } });
+    return readVisitCounter(c);
+  });
 }
 
 /** "Online now" = distinct visitors who loaded a page in the last 5 minutes. Visitor ids are shortened for display. */
@@ -240,6 +274,7 @@ export async function getLiveVisitors(actor: Actor | null, conn: Queryable = db)
     visitors: list.slice(0, 50).map((v) => ({ visitor: v.visitor, path: v.path, country: v.country, device: v.device, lastSeen: new Date(v.last_seen).toISOString(), pages: v.pages })),
     topPaths: [...paths.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([path, visitors]) => ({ path, visitors })),
     hourly: hourly.map((h) => h.n),
+    counter: await readVisitCounter(conn),
   };
 }
 

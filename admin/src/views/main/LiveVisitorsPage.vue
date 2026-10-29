@@ -2,14 +2,22 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import BaseBreadcrumb from '@/components/shared/BaseBreadcrumb.vue';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue';
 import { api, errorMessage } from '@/utils/api';
-import { timeAgo } from '@/utils/format';
+import { dateTime, timeAgo } from '@/utils/format';
+
+interface Counter {
+  views: number;
+  visitors: number;
+  since: string;
+}
 
 interface Live {
   windowMinutes: number;
   online: number;
   visitors: { visitor: string; path: string; country: string | null; device: string | null; lastSeen: string; pages: number }[];
   topPaths: { path: string; visitors: number }[];
+  counter: Counter;
 }
 
 const headers = [
@@ -22,6 +30,7 @@ const headers = [
 ];
 const data = ref<Live | null>(null);
 const error = ref('');
+const confirmClear = ref(false);
 let timer: number | undefined;
 
 async function load() {
@@ -31,6 +40,10 @@ async function load() {
   } catch (e) {
     error.value = errorMessage(e);
   }
+}
+async function clearCount() {
+  const counter = await api.del<Counter>('/live/counter');
+  if (data.value) data.value = { ...data.value, counter };
 }
 onMounted(() => {
   load();
@@ -55,6 +68,22 @@ onBeforeUnmount(() => window.clearInterval(timer));
       </UiParentCard>
     </v-col>
     <v-col cols="12" lg="4">
+      <UiParentCard title="Visit count" class="mb-6">
+        <template #action>
+          <v-btn color="error" variant="tonal" size="small" :disabled="!data" @click="confirmClear = true">Clear count</v-btn>
+        </template>
+        <v-row dense>
+          <v-col cols="6">
+            <div class="text-h3 font-weight-bold">{{ (data?.counter.visitors ?? 0).toLocaleString() }}</div>
+            <div class="text-subtitle-2 text-medium-emphasis">Visitors</div>
+          </v-col>
+          <v-col cols="6">
+            <div class="text-h3 font-weight-bold">{{ (data?.counter.views ?? 0).toLocaleString() }}</div>
+            <div class="text-subtitle-2 text-medium-emphasis">Page views</div>
+          </v-col>
+        </v-row>
+        <div class="text-caption text-disabled mt-3">Counting since {{ data ? dateTime(data.counter.since) : '—' }}. Saved, so it keeps growing until you clear it.</div>
+      </UiParentCard>
       <UiParentCard title="Where they are">
         <div v-if="!data?.topPaths.length" class="text-disabled">No activity yet.</div>
         <div v-for="p in data?.topPaths ?? []" :key="p.path" class="d-flex py-1"><span class="text-truncate mr-2">{{ p.path }}</span><span class="ml-auto font-weight-medium">{{ p.visitors }}</span></div>
@@ -62,4 +91,12 @@ onBeforeUnmount(() => window.clearInterval(timer));
       <div class="text-caption text-disabled mt-3">Refreshes every 15 seconds. Visitors are anonymous and shown by a short code only.</div>
     </v-col>
   </v-row>
+  <ConfirmDialog
+    v-model="confirmClear"
+    title="Clear the visit count?"
+    message="Visitors and page views go back to 0 and start counting again from now. The analytics history is not affected."
+    confirm-label="Clear count"
+    color="error"
+    :on-confirm="clearCount"
+  />
 </template>
