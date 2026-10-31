@@ -317,12 +317,16 @@ export interface Health {
   cron: { job: string; lastRunAt: string; ok: boolean; detail: string | null; stale: boolean }[];
 }
 
+// Receipts send synchronously right after the Stripe webhook; /api/cron/email is only a daily
+// retry safety net (Vercel Hobby plan allows one run per day per job — see docs/DEPLOYMENT.md).
+// Thresholds below are sized for that daily cadence, not a frequent queue worker.
 const CRON_JOBS = [
-  { job: "email", maxMinutes: 15 },
+  { job: "email", maxMinutes: 26 * 60 },
   { job: "sweep", maxMinutes: 24 * 60 },
   { job: "cleanup", maxMinutes: 36 * 60 },
   { job: "youtube", maxMinutes: 36 * 60 },
 ];
+const EMAIL_STALE_MINUTES = CRON_JOBS.find((j) => j.job === "email")!.maxMinutes;
 
 export async function getHealth(actor: Actor | null, provider: { name: string; testMode: boolean }, conn: Queryable = db): Promise<Health> {
   requireRole(actor, "admin");
@@ -372,7 +376,7 @@ export async function getHealth(actor: Actor | null, provider: { name: string; t
     const stale = !at || Date.now() - at.getTime() > maxMinutes * 60_000;
     return { job, lastRunAt: at ? at.toISOString() : "", ok: !!r && r.last_ok, detail: r?.detail ?? (r ? null : "Never run"), stale };
   });
-  const emailOk = mail.failed === 0 && (mail.oldest ?? 0) < 30;
+  const emailOk = mail.failed === 0 && (mail.oldest ?? 0) < EMAIL_STALE_MINUTES;
   const ok = dbOk && emailOk;
   return {
     ok,
