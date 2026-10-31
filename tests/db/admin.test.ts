@@ -5,7 +5,7 @@ import { getPool, type Queryable } from "@/server/db";
 import { toAppError } from "@/server/errors";
 import { createAdminChannel, getAdminChannel, listAdminChannels, setChannelStatus, updateAdminChannel } from "@/server/services/admin-channels";
 import { getSettings, updateSettings } from "@/server/services/admin-config";
-import { clearVisitCounter, getAnalytics, getDashboard, getHealth, getLiveVisitors } from "@/server/services/admin-insights";
+import { clearVisitCounter, getAnalytics, getDayVisits, getDashboard, getHealth, getLiveVisitors } from "@/server/services/admin-insights";
 import { recordPageView, type Device } from "@/server/services/analytics";
 import { resolveReport } from "@/server/services/admin-reports";
 import { getAdminTransaction, listAdminTransactions } from "@/server/services/admin-transactions";
@@ -514,6 +514,31 @@ describe("dashboard, analytics, live and health", () => {
       const log = await listAuditLog(a, { entityType: "setting" }, c);
       expect(log.items[0]).toMatchObject({ action: "visits.clear", entityId: "visit_counter" });
       await expect(clearVisitCounter(await member(c), c)).rejects.toThrow();
+    }));
+
+  it("day filter counts one calendar day in the admin's time zone and leaves other days out", () =>
+    withRollback(async (c) => {
+      const a = await admin(c);
+      const at = (visitor: string, ts: string, device = "desktop", path = "/zz-day") =>
+        c.query("insert into public.page_views (visitor_id, path, device, created_at) values ($1, $2, $3, $4)", [visitor, path, device, ts]);
+      const v1 = randomUUID();
+      // 2026-10-30 in Colombo (+05:30) runs from 2026-10-29 18:30Z to 2026-10-30 18:30Z.
+      const base = await getDayVisits(a, { date: "2026-10-30", tz: "Asia/Colombo" }, c);
+      await at(v1, "2026-10-29T18:30:00Z");
+      await at(v1, "2026-10-30T12:00:00Z", "desktop", "/zz-day-2");
+      await at(randomUUID(), "2026-10-30T18:29:00Z");
+      await at(randomUUID(), "2026-10-30T18:30:00Z"); // next day in Colombo
+      await at(randomUUID(), "2026-10-29T18:29:00Z"); // previous day
+      await at(randomUUID(), "2026-10-30T10:00:00Z", "bot");
+
+      const out = await getDayVisits(a, { date: "2026-10-30", tz: "Asia/Colombo" }, c);
+      expect(out.views - base.views).toBe(3);
+      expect(out.visitors - base.visitors).toBe(2);
+      expect(out.topPaths.find((p) => p.path === "/zz-day")!.views).toBeGreaterThanOrEqual(2);
+      expect(out.historyDays).toBe(90);
+      expect((await invalid(getDayVisits(a, { date: "2026-02-30" }, c))).code).toBe("VALIDATION");
+      expect((await invalid(getDayVisits(a, { date: "2026-10-30", tz: "Mars/Base" }, c))).code).toBe("VALIDATION");
+      await expect(getDayVisits(await member(c), { date: "2026-10-30" }, c)).rejects.toThrow();
     }));
 
   it("health reports the database, payment test mode, email backlog and cron freshness", () =>

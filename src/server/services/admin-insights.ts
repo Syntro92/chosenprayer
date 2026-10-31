@@ -1,8 +1,9 @@
 import "server-only";
-import { analyticsQuerySchema, RANGES } from "@/lib/schemas/admin";
+import { analyticsQuerySchema, liveDayQuerySchema, RANGES } from "@/lib/schemas/admin";
 import { requireRole, type Actor } from "../auth/policy";
 import { db, inTransaction, one, rows, type Queryable } from "../db";
 import { audit } from "./audit";
+import { RETENTION } from "./cleanup";
 import { countOpenReports } from "./moderation";
 import { listAdminTransactions, type AdminTransaction } from "./admin-transactions";
 
@@ -276,6 +277,33 @@ export async function getLiveVisitors(actor: Actor | null, conn: Queryable = db)
     hourly: hourly.map((h) => h.n),
     counter: await readVisitCounter(conn),
   };
+}
+
+export interface DayVisits {
+  date: string;
+  views: number;
+  visitors: number;
+  topPaths: { path: string; views: number }[];
+  /** How many days back page views are kept (older days are always empty). */
+  historyDays: number;
+}
+
+/** Visitors and page views for one calendar day in `tz`, from the page-view history (bots excluded). */
+export async function getDayVisits(actor: Actor | null, raw: unknown, conn: Queryable = db): Promise<DayVisits> {
+  requireRole(actor, "admin");
+  const { date, tz } = liveDayQuerySchema.parse(raw);
+  const inDay = `created_at >= $1::date::timestamp at time zone $2 and created_at < ($1::date + 1)::timestamp at time zone $2 and coalesce(device, '') <> 'bot'`;
+  const totals = (await one<{ views: number; visitors: number }>(
+    `select count(*)::int as views, count(distinct visitor_id)::int as visitors from public.page_views where ${inDay}`,
+    [date, tz],
+    conn,
+  ))!;
+  const paths = await rows<{ path: string; views: number }>(
+    `select path, count(*)::int as views from public.page_views where ${inDay} group by path order by views desc, path limit 5`,
+    [date, tz],
+    conn,
+  );
+  return { date, views: totals.views, visitors: totals.visitors, topPaths: paths, historyDays: RETENTION.pageViewDays };
 }
 
 export interface Health {

@@ -35,6 +35,9 @@ interface Channel {
   youtubeChannelId: string | null;
   youtubeSubscribers: number | null;
   youtubeSyncedAt: string | null;
+  facebookPageId: string | null;
+  facebookFollowers: number | null;
+  facebookSyncedAt: string | null;
   currency: string;
   owner: { name: string; username: string } | null;
   createdAt: string;
@@ -79,6 +82,7 @@ onMounted(async () => {
     fill(c);
     // Keep the subscriber count fresh: re-fetch from YouTube when it has never synced or is over an hour old.
     if (c.youtubeChannelId && (!c.youtubeSyncedAt || Date.now() - new Date(c.youtubeSyncedAt).getTime() > 3600_000)) void syncYoutube(true);
+    if (c.facebookPageId && (!c.facebookSyncedAt || Date.now() - new Date(c.facebookSyncedAt).getTime() > 3600_000)) void syncFacebook(true);
   } catch (e) {
     loadError.value = errorMessage(e);
   }
@@ -138,6 +142,27 @@ async function syncYoutube(quiet = false) {
     if (!quiet) ytError.value = errorMessage(err);
   } finally {
     ytBusy.value = false;
+  }
+}
+
+// Facebook link: followers and recent posts are pulled in by the server (and refreshed daily).
+const fbInput = ref('');
+const fbBusy = ref(false);
+const fbMessage = ref('');
+const fbError = ref('');
+async function syncFacebook(quiet = false) {
+  fbBusy.value = true;
+  fbMessage.value = '';
+  fbError.value = '';
+  try {
+    const r = await api.post<{ posts: number }>(`/channels/${id}/facebook`, fbInput.value.trim() ? { facebookPage: fbInput.value.trim() } : {});
+    fbInput.value = '';
+    fill(await api.get<Channel>(`/channels/${id}`));
+    if (!quiet) fbMessage.value = `Synced. ${r.posts} recent post${r.posts === 1 ? '' : 's'} up to date.`;
+  } catch (err) {
+    if (!quiet) fbError.value = errorMessage(err);
+  } finally {
+    fbBusy.value = false;
   }
 }
 
@@ -210,6 +235,21 @@ async function changeStatus(note: string) {
         </div>
         <v-alert v-if="ytError" type="error" variant="tonal" class="mt-3">{{ ytError }}</v-alert>
         <v-alert v-if="ytMessage" type="success" variant="tonal" class="mt-3">{{ ytMessage }}</v-alert>
+      </UiParentCard>
+      <UiParentCard title="Facebook" class="mb-6">
+        <div v-if="channel.facebookPageId" class="mb-3">
+          <div class="text-h4">{{ channel.facebookFollowers === null ? 'Hidden' : channel.facebookFollowers.toLocaleString() }} <span class="text-body-2 text-disabled">followers</span></div>
+          <div class="text-body-2 text-medium-emphasis">
+            <a :href="`https://www.facebook.com/${channel.facebookPageId}`" target="_blank" rel="noopener">{{ channel.facebookPageId }}</a> · last synced {{ dateOnly(channel.facebookSyncedAt) }}
+          </div>
+        </div>
+        <div v-else class="text-body-2 text-medium-emphasis mb-3">Not linked to a Facebook Page.</div>
+        <div class="d-flex ga-2 align-start">
+          <v-text-field v-model="fbInput" :label="channel.facebookPageId ? 'Link a different page (optional)' : 'Facebook Page ID'" placeholder="e.g. 100064..., a page link or username" hide-details="auto" density="comfortable" />
+          <v-btn color="primary" rounded="0" height="48" :loading="fbBusy" :disabled="!channel.facebookPageId && !fbInput.trim()" @click="syncFacebook()">{{ fbInput.trim() ? 'Link & sync' : 'Sync now' }}</v-btn>
+        </div>
+        <v-alert v-if="fbError" type="error" variant="tonal" class="mt-3">{{ fbError }}</v-alert>
+        <v-alert v-if="fbMessage" type="success" variant="tonal" class="mt-3">{{ fbMessage }}</v-alert>
       </UiParentCard>
       <UiParentCard title="Edit details">
         <v-form @submit="save">

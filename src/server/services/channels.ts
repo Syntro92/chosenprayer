@@ -309,8 +309,8 @@ export async function getChannelProfile(
   if (!parsed.success) throw new AppError("NOT_FOUND", "Channel not found.");
   const handle = parsed.data;
 
-  const base = await one<SummaryRow & { about: string[]; mission: string; blessing_count: number; show_blessings: boolean; youtube_channel_id: string | null }>(
-    `select ${SUMMARY_COLUMNS}, c.about, c.mission, c.blessing_count, c.show_blessings, c.youtube_channel_id
+  const base = await one<SummaryRow & { about: string[]; mission: string; blessing_count: number; show_blessings: boolean; youtube_channel_id: string | null; facebook_page_id: string | null }>(
+    `select ${SUMMARY_COLUMNS}, c.about, c.mission, c.blessing_count, c.show_blessings, c.youtube_channel_id, c.facebook_page_id
      from public.channels c join public.categories cat on cat.slug = c.category
      where c.handle = $1 and c.status = 'active'`,
     [handle],
@@ -381,6 +381,7 @@ export async function getChannelProfile(
     data: {
       about: base.about,
       ...(base.youtube_channel_id ? { youtubeUrl: `https://www.youtube.com/channel/${base.youtube_channel_id}` } : {}),
+      ...(base.facebook_page_id ? { facebookUrl: `https://www.facebook.com/${base.facebook_page_id}` } : {}),
       mission: base.mission,
       links,
       content: content.map((c) => ({

@@ -34,6 +34,9 @@ const schema = z.object({
 
   // YouTube Data API v3 key (Google Cloud Console > APIs & Services > Credentials). Needed to link channels.
   YOUTUBE_API_KEY: z.string().optional(),
+
+  // Facebook Graph API access token (Page or app access token, with access to the pages being linked).
+  FACEBOOK_ACCESS_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

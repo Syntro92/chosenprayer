@@ -11,6 +11,8 @@ import { CHANNEL_IMAGE_BUCKET } from "@/lib/channels";
 import { channelImageUrl, channelImages } from "../storage";
 import { fetchYoutubeChannel } from "../providers/youtube";
 import { saveYoutubeData } from "./youtube";
+import { fetchFacebookPage } from "../providers/facebook";
+import { saveFacebookData } from "./facebook";
 
 export interface AdminChannel {
   id: string;
@@ -46,6 +48,9 @@ export interface AdminChannelDetail extends AdminChannel {
   youtubeChannelId: string | null;
   youtubeSubscribers: number | null;
   youtubeSyncedAt: string | null;
+  facebookPageId: string | null;
+  facebookFollowers: number | null;
+  facebookSyncedAt: string | null;
 }
 
 export interface AdminPage<T> {
@@ -63,6 +68,7 @@ interface Row {
   created_at: string; published_at: string | null;
   mission?: string; about?: string[]; cover_tone?: string; cover_scene?: string; avatar_path?: string | null; cover_path?: string | null; donation_count?: number;
   youtube_channel_id?: string | null; youtube_subscribers?: string | null; youtube_synced_at?: string | null;
+  facebook_page_id?: string | null; facebook_followers?: string | null; facebook_synced_at?: string | null;
 }
 
 const SELECT = `
@@ -73,6 +79,7 @@ const SELECT = `
          c.created_at::text as created_at, c.published_at::text as published_at,
          c.mission, c.about, c.cover_tone::text as cover_tone, c.cover_scene::text as cover_scene, c.avatar_path, c.cover_path,
          c.youtube_channel_id, c.youtube_subscribers::text as youtube_subscribers, c.youtube_synced_at::text as youtube_synced_at,
+         c.facebook_page_id, c.facebook_followers::text as facebook_followers, c.facebook_synced_at::text as facebook_synced_at,
          (select count(*)::int from public.donations d where d.channel_id = c.id and d.status = 'succeeded') as donation_count
   from public.channels c
   join public.categories cat on cat.slug = c.category
@@ -113,6 +120,9 @@ const toDetail = (r: Row): AdminChannelDetail => ({
   youtubeChannelId: r.youtube_channel_id ?? null,
   youtubeSubscribers: r.youtube_subscribers == null ? null : Number(r.youtube_subscribers),
   youtubeSyncedAt: r.youtube_synced_at ? new Date(r.youtube_synced_at).toISOString() : null,
+  facebookPageId: r.facebook_page_id ?? null,
+  facebookFollowers: r.facebook_followers == null ? null : Number(r.facebook_followers),
+  facebookSyncedAt: r.facebook_synced_at ? new Date(r.facebook_synced_at).toISOString() : null,
 });
 
 /** Every referenced image must really be in the bucket (uploaded through the admin endpoint). */
@@ -175,8 +185,9 @@ export interface ChannelChange {
 export async function createAdminChannel(actor: Actor | null, raw: unknown, conn: Queryable = db): Promise<ChannelChange> {
   const a = requireRole(actor, "admin");
   const input = createChannelSchema.parse(raw);
-  // Fetch from YouTube first (network, outside the transaction); a bad ID fails before anything is saved.
+  // Fetch from YouTube/Facebook first (network, outside the transaction); a bad ID fails before anything is saved.
   const yt = input.youtubeChannel ? await fetchYoutubeChannel(input.youtubeChannel) : null;
+  const fb = input.facebookPage ? await fetchFacebookPage(input.facebookPage) : null;
 
   return inTransaction(conn, async (c) => {
     const category = await one("select 1 as ok from public.categories where slug = $1", [input.category], c);
@@ -203,12 +214,13 @@ export async function createAdminChannel(actor: Actor | null, raw: unknown, conn
       c,
     );
     if (yt) await saveYoutubeData(c, created!.id, yt);
+    if (fb) await saveFacebookData(c, created!.id, fb);
     await audit(c, {
       actorId: a.userId,
       action: "channel.create",
       entityType: "channel",
       entityId: created!.id,
-      metadata: { handle: input.handle, status: input.status, ...(yt ? { youtube: yt.channelId } : {}) },
+      metadata: { handle: input.handle, status: input.status, ...(yt ? { youtube: yt.channelId } : {}), ...(fb ? { facebook: fb.pageId } : {}) },
     });
     const detail = toDetail((await one<Row>(`${SELECT} where c.id = $1`, [created!.id], c))!);
     return { channel: detail, handle: detail.handle };

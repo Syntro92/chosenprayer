@@ -73,6 +73,8 @@ export type RecentSupporter = {
 export type ChannelProfileData = {
   /** Link to the channel on YouTube ("View all content"); absent when none is linked. */
   youtubeUrl?: string;
+  /** Link to the page on Facebook; absent when none is linked. */
+  facebookUrl?: string;
   about: string[];
   mission: string;
   links: { label: string; href: string }[];

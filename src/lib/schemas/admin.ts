@@ -58,11 +58,17 @@ export const createChannelSchema = z.object({
   ownerUsername: optional(z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,30}$/, "Unknown username")),
   /** Optional: YouTube channel ID (UC…), channel link or @handle. Subscribers and videos are fetched server-side. */
   youtubeChannel: optional(text(200)),
+  /** Optional: Facebook Page ID, page link or username. Followers and posts are fetched server-side. */
+  facebookPage: optional(text(200)),
 });
 
 export const youtubeChannelSchema = z.object({ channel: z.string().trim().min(1, "Enter a YouTube channel ID").max(200) });
 /** POST /channels/:id/youtube: with a value it (re)links the channel; without, it re-syncs the linked one. */
 export const youtubeSyncSchema = z.object({ youtubeChannel: optional(text(200)) });
+
+export const facebookPageSchema = z.object({ page: z.string().trim().min(1, "Enter a Facebook Page ID").max(200) });
+/** POST /channels/:id/facebook: with a value it (re)links the channel; without, it re-syncs the linked one. */
+export const facebookSyncSchema = z.object({ facebookPage: optional(text(200)) });
 
 /** PATCH: any subset of the editable fields. The handle is the public URL, so it never changes. */
 export const updateChannelSchema = z
@@ -160,6 +166,26 @@ export const analyticsQuerySchema = z.object({
   range: z.enum(["7d", "30d", "90d"]).default("30d"),
   /** Limit traffic and giving to one channel (its id). */
   channel: optional(z.string().uuid()),
+});
+
+/** GET /live/day: one calendar day (in the admin's own time zone) of visits. */
+export const liveDayQuerySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+    .refine((d) => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d), "Not a real date"),
+  tz: z
+    .string()
+    .max(64)
+    .default("UTC")
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("en", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Unknown time zone"),
 });
 
 export const auditQuerySchema = z.object({

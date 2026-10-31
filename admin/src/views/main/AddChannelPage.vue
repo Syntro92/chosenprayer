@@ -18,6 +18,17 @@ interface YoutubePreview {
   videos: { videoId: string; title: string; publishedAt: string; thumbnailUrl: string | null }[];
 }
 
+interface FacebookPreview {
+  pageId: string;
+  title: string;
+  description: string;
+  username: string | null;
+  thumbnailUrl: string | null;
+  followers: number | null;
+  postCount: number;
+  posts: { postId: string; message: string; createdAt: string; thumbnailUrl: string | null }[];
+}
+
 const router = useRouter();
 const categories = ref<{ slug: string; name: string }[]>([]);
 const form = ref({
@@ -41,6 +52,10 @@ const youtubeInput = ref('');
 const youtube = ref<YoutubePreview | null>(null);
 const fetching = ref(false);
 const youtubeError = ref('');
+const facebookInput = ref('');
+const facebook = ref<FacebookPreview | null>(null);
+const fbFetching = ref(false);
+const facebookError = ref('');
 const saving = ref(false);
 const error = ref('');
 const fieldErrors = ref<Record<string, string>>({});
@@ -73,6 +88,25 @@ async function fetchYoutube() {
   }
 }
 
+/** Look the page up on Facebook, show what will be imported, and pre-fill empty fields from it. */
+async function fetchFacebook() {
+  fbFetching.value = true;
+  facebookError.value = '';
+  facebook.value = null;
+  try {
+    const p = await api.get<FacebookPreview>('/facebook', { page: facebookInput.value });
+    facebook.value = p;
+    const f = form.value;
+    if (!f.name) f.name = p.title.slice(0, 80);
+    if (!f.description) f.description = p.description.split('\n')[0].slice(0, 200);
+    if (!f.handle && p.username) f.handle = p.username.toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 30);
+  } catch (err) {
+    facebookError.value = errorMessage(err);
+  } finally {
+    fbFetching.value = false;
+  }
+}
+
 async function save(e: Event) {
   e.preventDefault();
   saving.value = true;
@@ -92,6 +126,7 @@ async function save(e: Event) {
         .filter(Boolean),
       ownerUsername: f.ownerUsername.trim() || undefined,
       youtubeChannel: youtube.value?.channelId,
+      facebookPage: facebook.value?.pageId,
       status: f.status,
       featured: f.featured,
       verified: f.verified,
@@ -140,6 +175,29 @@ async function save(e: Event) {
               <div v-if="!youtube.videos.length" class="text-body-2 text-medium-emphasis">No public videos yet.</div>
             </v-card>
             <v-alert v-if="fieldErrors.youtubeChannel" type="error" variant="tonal" class="mt-3">{{ fieldErrors.youtubeChannel }}</v-alert>
+          </div>
+          <div class="mb-6">
+            <div class="d-flex ga-2 align-start">
+              <v-text-field variant="outlined" rounded="0" density="comfortable" v-model="facebookInput" label="Facebook Page ID (optional)" placeholder="e.g. 100064..., a page link or username" hint="Paste the Page ID, a page link or a username, then fetch. We import the follower count and recent posts." persistent-hint :error-messages="facebookError" @keydown.enter.prevent="fetchFacebook" />
+              <v-btn color="primary" variant="tonal" rounded="0" height="48" :loading="fbFetching" :disabled="!facebookInput.trim()" @click="fetchFacebook">Fetch</v-btn>
+            </div>
+            <v-card v-if="facebook" variant="tonal" rounded="0" class="mt-3 pa-4">
+              <div class="d-flex align-center ga-3 mb-3">
+                <v-avatar v-if="facebook.thumbnailUrl" size="48"><v-img :src="facebook.thumbnailUrl" /></v-avatar>
+                <div>
+                  <div class="text-subtitle-1">{{ facebook.title }}</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    {{ facebook.followers === null ? 'Followers hidden' : facebook.followers.toLocaleString() + ' followers' }} · {{ facebook.postCount.toLocaleString() }} recent posts
+                  </div>
+                </div>
+              </div>
+              <div class="text-caption text-disabled mb-1">Recent posts that will be added to the channel</div>
+              <div v-for="p in facebook.posts" :key="p.postId" class="text-body-2 d-flex justify-space-between ga-3">
+                <span class="text-truncate">{{ p.message.split('\n')[0] || 'Facebook update' }}</span><span class="text-disabled flex-shrink-0">{{ dateOnly(p.createdAt) }}</span>
+              </div>
+              <div v-if="!facebook.posts.length" class="text-body-2 text-medium-emphasis">No public posts yet.</div>
+            </v-card>
+            <v-alert v-if="fieldErrors.facebookPage" type="error" variant="tonal" class="mt-3">{{ fieldErrors.facebookPage }}</v-alert>
           </div>
           <ImageUpload label="Channel image (profile picture)" shape="avatar" :path="form.avatarPath" :url="form.avatarUrl" hint="Square works best. Shown on cards and the channel page." @change="(v) => { form.avatarPath = v.path; form.avatarUrl = v.url; }" />
           <ImageUpload label="Cover image" shape="cover" :path="form.coverPath" :url="form.coverUrl" hint="Wide image, about 1600 × 600. Leave empty to use the generated cover." @change="(v) => { form.coverPath = v.path; form.coverUrl = v.url; }" />

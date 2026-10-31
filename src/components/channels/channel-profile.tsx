@@ -1185,11 +1185,18 @@ export function ChannelProfile({
                 </article>
               ))}
             </div>
-            {data.youtubeUrl && (
-              <div className="mt-8">
-                <a href={data.youtubeUrl} target="_blank" rel="noopener noreferrer" className={ghostBtn}>
-                  View All Content
-                </a>
+            {(data.youtubeUrl || data.facebookUrl) && (
+              <div className="mt-8 flex flex-wrap gap-3">
+                {data.youtubeUrl && (
+                  <a href={data.youtubeUrl} target="_blank" rel="noopener noreferrer" className={ghostBtn}>
+                    View All Content
+                  </a>
+                )}
+                {data.facebookUrl && (
+                  <a href={data.facebookUrl} target="_blank" rel="noopener noreferrer" className={ghostBtn}>
+                    View on Facebook
+                  </a>
+                )}
               </div>
             )}
           </section>
