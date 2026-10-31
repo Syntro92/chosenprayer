@@ -70,6 +70,15 @@ export const facebookPageSchema = z.object({ page: z.string().trim().min(1, "Ent
 /** POST /channels/:id/facebook: with a value it (re)links the channel; without, it re-syncs the linked one. */
 export const facebookSyncSchema = z.object({ facebookPage: optional(text(200)) });
 
+/**
+ * PUT /channels/:id/content: exactly 3 slots for the "Latest from" grid. Each slot is a
+ * `channel_content` id (one of the channel's own synced videos/posts) or null to leave that slot to
+ * the automatic "most recent" fallback.
+ */
+export const channelContentFeaturedSchema = z.object({
+  featured: z.array(z.string().uuid().nullable()).length(3, "Expected 3 slots"),
+});
+
 /** PATCH: any subset of the editable fields. The handle is the public URL, so it never changes. */
 export const updateChannelSchema = z
   .object({

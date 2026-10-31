@@ -337,7 +337,8 @@ export async function getChannelProfile(
             youtube_id, cover_tone, cover_scene
      from public.channel_content
      where channel_id = $1 and published_at is not null and published_at <= now()
-     order by published_at desc limit 3`,
+     order by (featured_position is null), featured_position, published_at desc
+     limit 3`,
     [base.id],
     conn,
   );

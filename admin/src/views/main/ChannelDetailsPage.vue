@@ -44,6 +44,16 @@ interface Channel {
   publishedAt: string | null;
 }
 
+interface ContentItem {
+  id: string;
+  kind: 'reflection' | 'video' | 'message' | 'story';
+  title: string;
+  date: string;
+  youtubeId: string | null;
+  facebookId: string | null;
+  featuredPosition: number | null;
+}
+
 const route = useRoute();
 const id = String(route.params.id);
 const channel = ref<Channel | null>(null);
@@ -86,6 +96,7 @@ onMounted(async () => {
   } catch (e) {
     loadError.value = errorMessage(e);
   }
+  void loadContent();
 });
 
 async function save(e: Event) {
@@ -137,6 +148,7 @@ async function syncYoutube(quiet = false) {
     const r = await api.post<{ videos: number }>(`/channels/${id}/youtube`, ytInput.value.trim() ? { youtubeChannel: ytInput.value.trim() } : {});
     ytInput.value = '';
     fill(await api.get<Channel>(`/channels/${id}`));
+    void loadContent();
     if (!quiet) ytMessage.value = `Synced. ${r.videos} recent video${r.videos === 1 ? '' : 's'} up to date.`;
   } catch (err) {
     if (!quiet) ytError.value = errorMessage(err);
@@ -158,11 +170,55 @@ async function syncFacebook(quiet = false) {
     const r = await api.post<{ posts: number }>(`/channels/${id}/facebook`, fbInput.value.trim() ? { facebookPage: fbInput.value.trim() } : {});
     fbInput.value = '';
     fill(await api.get<Channel>(`/channels/${id}`));
+    void loadContent();
     if (!quiet) fbMessage.value = `Synced. ${r.posts} recent post${r.posts === 1 ? '' : 's'} up to date.`;
   } catch (err) {
     if (!quiet) fbError.value = errorMessage(err);
   } finally {
     fbBusy.value = false;
+  }
+}
+
+// Featured content: which 3 synced videos/posts fill the "Latest from" slots on the public page,
+// and in what order. A slot left on "Auto" falls back to the most recently synced item.
+const content = ref<ContentItem[]>([]);
+const contentLoadError = ref('');
+const slots = ref<(string | null)[]>([null, null, null]);
+const contentBusy = ref(false);
+const contentSaved = ref(false);
+const contentError = ref('');
+
+async function loadContent() {
+  try {
+    content.value = await api.get<ContentItem[]>(`/channels/${id}/content`);
+    const s: (string | null)[] = [null, null, null];
+    for (const item of content.value) if (item.featuredPosition) s[item.featuredPosition - 1] = item.id;
+    slots.value = s;
+  } catch (e) {
+    contentLoadError.value = errorMessage(e);
+  }
+}
+
+function itemLabel(item: ContentItem) {
+  return `${label(item.kind)} — ${item.title} (${dateOnly(item.date)})`;
+}
+/** Items still available for a slot: not already chosen in one of the other two slots. */
+function optionsFor(slotIndex: number) {
+  const chosenElsewhere = new Set(slots.value.filter((v, i) => i !== slotIndex && v));
+  return content.value.filter((c) => !chosenElsewhere.has(c.id));
+}
+
+async function saveFeatured() {
+  contentBusy.value = true;
+  contentSaved.value = false;
+  contentError.value = '';
+  try {
+    content.value = await api.put<ContentItem[]>(`/channels/${id}/content`, { featured: slots.value });
+    contentSaved.value = true;
+  } catch (e) {
+    contentError.value = errorMessage(e);
+  } finally {
+    contentBusy.value = false;
   }
 }
 
@@ -250,6 +306,29 @@ async function changeStatus(note: string) {
         </div>
         <v-alert v-if="fbError" type="error" variant="tonal" class="mt-3">{{ fbError }}</v-alert>
         <v-alert v-if="fbMessage" type="success" variant="tonal" class="mt-3">{{ fbMessage }}</v-alert>
+      </UiParentCard>
+      <UiParentCard title="Featured content" class="mb-6">
+        <div class="text-body-2 text-medium-emphasis mb-3">
+          Choose which synced video or post fills each of the 3 "Latest from" slots on the channel page. Leave a slot on Auto to show the most recently synced item there instead.
+        </div>
+        <v-alert v-if="contentLoadError" type="error" variant="tonal" class="mb-3">{{ contentLoadError }}</v-alert>
+        <div v-else-if="content.length === 0" class="text-body-2 text-medium-emphasis mb-3">Nothing synced from YouTube or Facebook yet.</div>
+        <template v-else>
+          <v-select
+            v-for="(_, i) in slots"
+            :key="i"
+            v-model="slots[i]"
+            :items="[{ id: null, title: 'Auto (most recently synced)' }, ...optionsFor(i).map((c) => ({ id: c.id, title: itemLabel(c) }))]"
+            item-title="title"
+            item-value="id"
+            :label="`Slot ${i + 1}`"
+            density="comfortable"
+            class="mb-3"
+          />
+          <v-btn color="primary" rounded="0" height="48" :loading="contentBusy" @click="saveFeatured">Save slots</v-btn>
+          <v-alert v-if="contentError" type="error" variant="tonal" class="mt-3">{{ contentError }}</v-alert>
+          <v-alert v-if="contentSaved" type="success" variant="tonal" class="mt-3">Saved.</v-alert>
+        </template>
       </UiParentCard>
       <UiParentCard title="Edit details">
         <v-form @submit="save">
