@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import BaseBreadcrumb from '@/components/shared/BaseBreadcrumb.vue';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
 import ImageUpload from '@/components/shared/ImageUpload.vue';
@@ -55,6 +55,7 @@ interface ContentItem {
 }
 
 const route = useRoute();
+const router = useRouter();
 const id = String(route.params.id);
 const channel = ref<Channel | null>(null);
 const categories = ref<{ slug: string; name: string }[]>([]);
@@ -247,6 +248,13 @@ async function changeStatus(note: string) {
   if (!pending.value) return;
   fill(await api.post<Channel>(`/channels/${id}/status`, { status: pending.value.status, note: note || undefined }));
 }
+
+// Permanent delete: only possible when the channel has no donation history (enforced server-side).
+const deleteDialog = ref(false);
+async function deleteChannel() {
+  await api.del(`/channels/${id}`);
+  router.push('/channels');
+}
 </script>
 
 <template>
@@ -274,6 +282,8 @@ async function changeStatus(note: string) {
         </div>
         <v-btn v-if="channel.status === 'active'" class="mt-3" variant="text" size="small" :href="`/channels/${channel.handle}`" target="_blank">View on website</v-btn>
         <v-btn class="mt-3" variant="text" size="small" :to="`/transactions?channel=${channel.handle}`">See its transactions</v-btn>
+        <v-divider class="my-3" />
+        <v-btn variant="outlined" color="error" size="small" @click="deleteDialog = true">Delete channel</v-btn>
       </UiParentCard>
     </v-col>
     <v-col cols="12" lg="8">
@@ -362,5 +372,14 @@ async function changeStatus(note: string) {
     :color="pending.color"
     reason-label="Note for the owner (optional)"
     :on-confirm="changeStatus"
+  />
+  <ConfirmDialog
+    v-if="channel"
+    v-model="deleteDialog"
+    title="Permanently delete this channel?"
+    :message="`This removes ${channel.name} and all its content. This can't be undone. Channels with donation history can't be deleted — archive them instead.`"
+    confirm-label="Delete permanently"
+    color="error"
+    :on-confirm="deleteChannel"
   />
 </template>

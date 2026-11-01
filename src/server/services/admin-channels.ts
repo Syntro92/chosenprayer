@@ -333,3 +333,48 @@ export async function setChannelStatus(actor: Actor | null, rawId: string, raw: 
     return { channel: toDetail((await one<Row>(`${SELECT} where c.id = $1`, [id.data], c))!), handle: ch.handle };
   });
 }
+
+/**
+ * Permanently remove a channel. Donations and subscriptions are ON DELETE RESTRICT at the
+ * database level, so this is only possible when the channel has no financial history at all —
+ * archive it instead otherwise.
+ */
+export async function deleteAdminChannel(actor: Actor | null, rawId: string, conn: Queryable = db): Promise<{ handle: string }> {
+  const a = requireRole(actor, "admin");
+  const id = uuidSchema.safeParse(rawId);
+  if (!id.success) throw notFound();
+
+  const { handle, avatarPath, coverPath } = await inTransaction(conn, async (c) => {
+    const ch = await one<{ handle: string; name: string; avatar_path: string | null; cover_path: string | null }>(
+      "select handle::text as handle, name, avatar_path, cover_path from public.channels where id = $1 for update",
+      [id.data],
+      c,
+    );
+    if (!ch) throw notFound();
+
+    const hasHistory = await one<{ ok: boolean }>(
+      `select exists(
+         select 1 from public.donations where channel_id = $1
+         union all
+         select 1 from public.subscriptions where channel_id = $1
+       ) as ok`,
+      [id.data],
+      c,
+    );
+    if (hasHistory?.ok) {
+      throw new AppError("CONFLICT", "This channel has donation history and can't be deleted. Archive it instead.");
+    }
+
+    await c.query("delete from public.channels where id = $1", [id.data]);
+    await audit(c, {
+      actorId: a.userId,
+      action: "channel.delete",
+      entityType: "channel",
+      entityId: id.data,
+      metadata: { handle: ch.handle },
+    });
+    return { handle: ch.handle, avatarPath: ch.avatar_path, coverPath: ch.cover_path };
+  });
+  await channelImages.remove([avatarPath, coverPath]);
+  return { handle };
+}

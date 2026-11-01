@@ -20,6 +20,7 @@ export type AuditAction =
   | "channel.create"
   | "channel.update"
   | "channel.status"
+  | "channel.delete"
   | "setting.update"
   | "visits.clear";
 
