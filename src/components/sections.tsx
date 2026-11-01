@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CoverPhoto, TONE_CLASS } from "@/components/channels/illustrations";
-import { formatFollowers } from "@/lib/channels";
+import { formatFollowers, socialAudience } from "@/lib/channels";
 import { listChannelsPublic } from "@/server/cache/channels";
 import { getBlessingsCountCached } from "@/server/cache/site";
 
@@ -166,7 +166,9 @@ export async function ExploreChannels() {
         </div>
 
         <div className="mt-14 grid gap-8 md:grid-cols-2">
-          {channels.map((c) => (
+          {channels.map((c) => {
+            const audience = socialAudience(c);
+            return (
             <article
               key={c.handle}
               className="group overflow-hidden rounded-[20px] border border-line bg-white shadow-[0_1px_2px_rgba(23,25,24,0.04)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_-18px_rgba(23,25,24,0.25)]"
@@ -195,9 +197,9 @@ export async function ExploreChannels() {
                 <div className="mt-6 flex items-center justify-between gap-4 border-t border-line pt-5">
                   <dl className="flex gap-6 text-sm">
                     <div>
-                      <dt className="text-slate">Subscribers</dt>
+                      <dt className="text-slate capitalize">{audience.label}</dt>
                       <dd className="font-semibold text-charcoal-deep">
-                        {c.subscribers == null ? "—" : formatFollowers(c.subscribers)}
+                        {audience.count == null ? "—" : formatFollowers(audience.count)}
                       </dd>
                     </div>
                   </dl>
@@ -210,7 +212,8 @@ export async function ExploreChannels() {
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-12 flex justify-center">

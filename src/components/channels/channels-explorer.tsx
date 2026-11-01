@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   formatFollowers,
+  socialAudience,
   type Channel,
 } from "@/lib/channels";
 import { CoverArt, CoverPhoto, EmptyIllustration, TONE_CLASS } from "./illustrations";
@@ -46,13 +47,14 @@ function Avatar({ name, url, className }: { name: string; url?: string | null; c
 }
 
 function Stats({ channel }: { channel: Channel }) {
+  const audience = socialAudience(channel);
   return (
     <dl className="flex gap-6 text-sm">
       <div>
         <dd className="font-semibold text-charcoal-deep">
-          {channel.subscribers == null ? "—" : formatFollowers(channel.subscribers)}
+          {audience.count == null ? "—" : formatFollowers(audience.count)}
         </dd>
-        <dt className="text-slate">subscribers</dt>
+        <dt className="text-slate">{audience.label}</dt>
       </div>
     </dl>
   );

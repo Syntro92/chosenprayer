@@ -30,6 +30,8 @@ export type Channel = {
   supporters: number;
   /** YouTube subscribers; null/absent when no YouTube channel is linked or the owner hides the count. */
   subscribers?: number | null;
+  /** Facebook followers; null/absent when no Facebook Page is linked. Shown when there's no YouTube count. */
+  facebookFollowers?: number | null;
   createdAt: string; // ISO timestamp, used for "Newest"
   cover: { tone: CoverTone; scene: CoverScene };
   /** Uploaded profile picture / cover photo. Absent: the initial-letter avatar and generated cover are shown. */
@@ -49,6 +51,8 @@ export type ChannelContent = {
   date: string; // YYYY-MM-DD
   cover: { tone: CoverTone; scene: CoverScene };
   youtubeId?: string; // 11-character YouTube video id; renders a playable video card
+  imageUrl?: string; // external thumbnail (e.g. a synced Facebook post's photo); shown instead of the generic cover
+  externalUrl?: string; // opens the original post (e.g. on Facebook) in a new tab when imageUrl is set
 };
 
 export type Blessing = {
@@ -104,6 +108,16 @@ const full = new Intl.NumberFormat("en");
 export const formatFollowers = (n: number) =>
   n >= 1000 ? compact.format(n) : full.format(n);
 export const formatSupporters = (n: number) => full.format(n);
+
+/** Prefers YouTube subscribers; falls back to Facebook followers when no YouTube channel is linked. */
+export function socialAudience(c: { subscribers?: number | null; facebookFollowers?: number | null }): {
+  count: number | null;
+  label: "subscribers" | "followers";
+} {
+  if (c.subscribers != null) return { count: c.subscribers, label: "subscribers" };
+  if (c.facebookFollowers != null) return { count: c.facebookFollowers, label: "followers" };
+  return { count: null, label: "followers" };
+}
 
 /** "just now", "5 minutes ago", "3 hours ago", "2 days ago"; falls back to the date after a month. */
 export function timeAgo(iso: string, now: number = Date.now()): string {

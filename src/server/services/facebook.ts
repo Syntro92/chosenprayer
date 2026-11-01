@@ -52,11 +52,12 @@ export async function saveFacebookData(conn: Queryable, channelId: string, fb: F
     const message = p.message.trim();
     const title = (message.split("\n")[0] || "Facebook update").slice(0, 140);
     await conn.query(
-      `insert into public.channel_content (channel_id, kind, title, excerpt, facebook_id, published_at)
-       values ($1, 'story', $2, $3, $4, $5)
+      `insert into public.channel_content (channel_id, kind, title, excerpt, facebook_id, facebook_image_url, facebook_permalink_url, published_at)
+       values ($1, 'story', $2, $3, $4, $5, $6, $7)
        on conflict (channel_id, facebook_id) where facebook_id is not null
-       do update set title = excluded.title, excerpt = excluded.excerpt, published_at = excluded.published_at`,
-      [channelId, title, message.slice(0, 300), p.postId, p.createdAt],
+       do update set title = excluded.title, excerpt = excluded.excerpt, facebook_image_url = excluded.facebook_image_url,
+                      facebook_permalink_url = excluded.facebook_permalink_url, published_at = excluded.published_at`,
+      [channelId, title, message.slice(0, 300), p.postId, p.thumbnailUrl, p.permalinkUrl, p.createdAt],
     );
   }
 }

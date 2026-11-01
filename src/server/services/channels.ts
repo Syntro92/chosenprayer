@@ -16,6 +16,7 @@ export interface ChannelSummary {
   followers: number;
   supporters: number;
   subscribers: number | null; // YouTube subscribers (null = not linked / hidden)
+  facebookFollowers: number | null; // Facebook followers (null = not linked)
   createdAt: string; // ISO timestamp
   cover: { tone: "cream" | "mist" | "sage" | "stone"; scene: "horizon" | "hills" | "sun" | "waves" };
   avatarUrl: string | null; // uploaded profile picture
@@ -88,6 +89,7 @@ interface SummaryRow {
   follower_count: number;
   supporter_count: number;
   youtube_subscribers: string | null;
+  facebook_followers: string | null;
   created_raw: string;
   cover_tone: ChannelSummary["cover"]["tone"];
   cover_scene: ChannelSummary["cover"]["scene"];
@@ -101,7 +103,7 @@ interface SummaryRow {
 
 const SUMMARY_COLUMNS = `
   c.id, c.handle::text as handle, c.name, c.description, cat.name as category, cat.slug as category_slug,
-  c.follower_count, c.supporter_count, c.youtube_subscribers::text as youtube_subscribers, to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as created_raw,
+  c.follower_count, c.supporter_count, c.youtube_subscribers::text as youtube_subscribers, c.facebook_followers::text as facebook_followers, to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as created_raw,
   c.cover_tone, c.cover_scene, c.avatar_path, c.cover_path, c.featured, c.verified, lower(c.name) as name_key`;
 
 const toSummary = (r: SummaryRow): ChannelSummary => ({
@@ -113,6 +115,7 @@ const toSummary = (r: SummaryRow): ChannelSummary => ({
   followers: r.follower_count,
   supporters: r.supporter_count,
   subscribers: r.youtube_subscribers == null ? null : Number(r.youtube_subscribers),
+  facebookFollowers: r.facebook_followers == null ? null : Number(r.facebook_followers),
   createdAt: new Date(r.created_raw).toISOString(),
   cover: { tone: r.cover_tone, scene: r.cover_scene },
   avatarUrl: channelImageUrl(r.avatar_path),
@@ -330,11 +333,13 @@ export async function getChannelProfile(
       excerpt: string;
       date: string;
       youtube_id: string | null;
+      facebook_image_url: string | null;
+      facebook_permalink_url: string | null;
       cover_tone: ChannelSummary["cover"]["tone"];
       cover_scene: ChannelSummary["cover"]["scene"];
   }>(
     `select id, kind, title, excerpt, to_char(published_at at time zone 'UTC', 'YYYY-MM-DD') as date,
-            youtube_id, cover_tone, cover_scene
+            youtube_id, facebook_image_url, facebook_permalink_url, cover_tone, cover_scene
      from public.channel_content
      where channel_id = $1 and published_at is not null and published_at <= now()
      order by (featured_position is null), featured_position, published_at desc
@@ -393,6 +398,8 @@ export async function getChannelProfile(
         date: c.date,
         cover: { tone: c.cover_tone, scene: c.cover_scene },
         ...(c.youtube_id ? { youtubeId: c.youtube_id } : {}),
+        ...(c.facebook_image_url ? { imageUrl: c.facebook_image_url } : {}),
+        ...(c.facebook_permalink_url ? { externalUrl: c.facebook_permalink_url } : {}),
       })),
       blessings: blessings.map((b) => ({
         id: b.id,

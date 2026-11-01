@@ -17,6 +17,7 @@ import {
   formatDate,
   formatFollowers,
   formatSupporters,
+  socialAudience,
   timeAgo,
   type Channel,
   type ChannelProfileData,
@@ -950,6 +951,23 @@ function YouTubeEmbed({ id, title }: { id: string; title: string }) {
   );
 }
 
+/** A synced post's own photo (e.g. from Facebook); opens the original post in a new tab when a link is known. */
+function ExternalContentEmbed({ imageUrl, href, title }: { imageUrl: string; href?: string; title: string }) {
+  /* eslint-disable-next-line @next/next/no-img-element -- external, not-yet-known host; next/image can't optimize it */
+  const img = <img src={imageUrl} alt="" loading="lazy" className="size-full object-cover transition duration-500 group-hover/play:scale-105" />;
+  return (
+    <div className="relative aspect-[16/10] overflow-hidden bg-charcoal-deep">
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" aria-label={title} className={`group/play absolute inset-0 ${focus}`}>
+          {img}
+        </a>
+      ) : (
+        img
+      )}
+    </div>
+  );
+}
+
 const HELPS = [
   ["Keep creating", "Helps the channel continue creating and sharing."],
   ["Reach more people", "Supports the time and resources behind the work."],
@@ -1039,6 +1057,8 @@ export function ChannelProfile({
     setBlessingsAdded((n) => n + 1);
   };
 
+  const audience = socialAudience(channel);
+
   return (
     <div>
       {/* The support card comes first, under the channel header. Same layout on every screen; scaled up and centred on desktop. */}
@@ -1061,7 +1081,7 @@ export function ChannelProfile({
             </h1>
             <p className="truncate text-sm text-slate lg:mt-1 lg:text-base">
               @{channel.handle}
-              {channel.subscribers != null && <> · {formatFollowers(channel.subscribers)} subscribers</>}
+              {audience.count != null && <> · {formatFollowers(audience.count)} {audience.label}</>}
               {data.youtubeUrl && (
                 <>
                   <span className="hidden lg:inline"> · </span>
@@ -1164,6 +1184,8 @@ export function ChannelProfile({
                 >
                   {c.youtubeId ? (
                     <YouTubeEmbed id={c.youtubeId} title={c.title} />
+                  ) : c.imageUrl ? (
+                    <ExternalContentEmbed imageUrl={c.imageUrl} href={c.externalUrl} title={c.title} />
                   ) : (
                     <div
                       className={`relative aspect-[16/10] overflow-hidden bg-gradient-to-br ${TONE_CLASS[c.cover.tone]}`}

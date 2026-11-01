@@ -23,26 +23,26 @@ const fb = (over: Partial<FacebookPage> = {}): FacebookPage => ({
   thumbnailUrl: null,
   followers: 1500,
   posts: [
-    { postId: "aaa_1", message: "First", createdAt: "2026-01-01T00:00:00Z", thumbnailUrl: null, permalinkUrl: null },
+    { postId: "aaa_1", message: "First", createdAt: "2026-01-01T00:00:00Z", thumbnailUrl: "https://fb.example/a.jpg", permalinkUrl: "https://facebook.com/a" },
     { postId: "bbb_2", message: "Second", createdAt: "2026-02-01T00:00:00Z", thumbnailUrl: null, permalinkUrl: null },
   ],
   ...over,
 });
 
 describe("saveFacebookData", () => {
-  it("stores followers and posts, and a re-sync updates instead of duplicating", () =>
+  it("stores followers, posts and each post's photo/link, and a re-sync updates instead of duplicating", () =>
     withRollback(async (c) => {
       const ch = await channel(c);
       await saveFacebookData(c, ch.id, fb());
-      await saveFacebookData(c, ch.id, fb({ followers: 2000, posts: [{ postId: "aaa_1", message: "First (renamed)", createdAt: "2026-01-01T00:00:00Z", thumbnailUrl: null, permalinkUrl: null }] }));
+      await saveFacebookData(c, ch.id, fb({ followers: 2000, posts: [{ postId: "aaa_1", message: "First (renamed)", createdAt: "2026-01-01T00:00:00Z", thumbnailUrl: "https://fb.example/a2.jpg", permalinkUrl: "https://facebook.com/a" }] }));
 
       const row = (await c.query("select facebook_page_id, facebook_followers::int as followers, facebook_synced_at from public.channels where id = $1", [ch.id])).rows[0];
       expect(row).toMatchObject({ facebook_page_id: ID, followers: 2000 });
       expect(row.facebook_synced_at).not.toBeNull();
-      const posts = (await c.query("select title, kind::text as kind from public.channel_content where channel_id = $1 order by title", [ch.id])).rows;
+      const posts = (await c.query("select title, kind::text as kind, facebook_image_url, facebook_permalink_url from public.channel_content where channel_id = $1 order by title", [ch.id])).rows;
       expect(posts).toEqual([
-        { title: "First (renamed)", kind: "story" },
-        { title: "Second", kind: "story" },
+        { title: "First (renamed)", kind: "story", facebook_image_url: "https://fb.example/a2.jpg", facebook_permalink_url: "https://facebook.com/a" },
+        { title: "Second", kind: "story", facebook_image_url: null, facebook_permalink_url: null },
       ]);
     }));
 
